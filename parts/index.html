@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Structural steel parts RoboScan welds</title>
+<meta name="description" content="Beams, columns, braces, lattice girders and railings in 3D, with the welds shown in orange. Illustrations, typical sizes.">
+<meta property="og:title" content="Structural steel parts RoboScan welds">
+<meta property="og:image" content="https://cloos-americas.github.io/roboscan-kit/parts/lineup.png">
+<meta name="theme-color" content="#2e393f">
+<link rel="stylesheet" href="parts.css">
+</head>
+<body>
+<header class="bar">
+  <a class="bar__back" href="../">&larr; <span>Back to the kit</span></a>
+  <p class="powered">powered by <b>CLOOS RoboScan</b></p>
+</header>
+<main class="layout">
+  <div class="view">
+    <div id="stage" class="stage" aria-label="3D view of a structural steel part. Drag to turn it."></div>
+    <p class="chip">Illustration. Typical sizes. Welds in orange.</p>
+  </div>
+  <aside class="side">
+    <h1>Your parts</h1>
+    <p class="lede">Pick a part. Drag to turn it. The orange lines are the welds RoboScan finds and welds.</p>
+    <ul class="picker">
+      <li><button type="button" data-part="beam-stiffeners">Beam with stiffeners and end plates</button></li>
+      <li><button type="button" data-part="column">Column with base plate and shear tabs</button></li>
+      <li><button type="button" data-part="beam-plates">Beam with plates on web and flange</button></li>
+      <li><button type="button" data-part="brace">Channel brace with gusset plates</button></li>
+      <li><button type="button" data-part="truss">Lattice girder</button></li>
+      <li><button type="button" data-part="railing">Railing section</button></li>
+    </ul>
+    <section class="info" data-info="beam-stiffeners">
+      <h2>Beam with stiffeners and end plates</h2>
+      <p>A W-beam with full depth stiffeners and a head plate on each end.</p>
+      <p class="codes-head">Connections from the library</p>
+      <ul class="codes">
+<li><b>C3</b> Stiffener</li><li><b>A1</b> Head plate</li>      </ul>
+    </section>
+    <section class="info" data-info="column" hidden>
+      <h2>Column with base plate and shear tabs</h2>
+      <p>A column with a base plate, a cap plate and shear tabs where the beams land.</p>
+      <p class="codes-head">Connections from the library</p>
+      <ul class="codes">
+<li><b>A2</b> Column base</li><li><b>A1</b> Head plate</li><li><b>C2</b> Shear tab</li>      </ul>
+    </section>
+    <section class="info" data-info="beam-plates" hidden>
+      <h2>Beam with plates on web and flange</h2>
+      <p>A beam with a reinforcing plate on the flange and connection plates on the web.</p>
+      <p class="codes-head">Connections from the library</p>
+      <ul class="codes">
+<li><b>B1</b> Reinforcing plate</li><li><b>C1</b> Plate on web</li><li><b>C2</b> Shear tab</li>      </ul>
+    </section>
+    <section class="info" data-info="brace" hidden>
+      <h2>Channel brace with gusset plates</h2>
+      <p>A channel with a plate on the profile at one end and a plate in the profile at the other.</p>
+      <p class="codes-head">Connections from the library</p>
+      <ul class="codes">
+<li><b>D1</b> Plate on profile</li><li><b>D2</b> Plate in profile</li>      </ul>
+    </section>
+    <section class="info" data-info="truss" hidden>
+      <h2>Lattice girder</h2>
+      <p>I-beam chords with square tube diagonals between them and end plates.</p>
+      <p class="codes-head">Same scanner and cell, with its own connection library.</p>
+    </section>
+    <section class="info" data-info="railing" hidden>
+      <h2>Railing section</h2>
+      <p>Top and bottom rails, posts with mounting plates and flat bar infill.</p>
+      <p class="codes-head">Same scanner and cell, with its own connection library.</p>
+    </section>
+    <p class="fine">Every real part still goes through the fit check before any quote.</p>
+    <p><a class="btn" href="mailto:cmontbriand@cloosrobot.com?subject=RoboScan%20fit%20check">Send CLOOS Americas a drawing</a></p>
+  </aside>
+</main>
+<script src="../cell/vendor/three.min.js"></script>
+<script src="../cell/vendor/OrbitControls.js"></script>
+<script src="parts.js"></script>
+</body>
+</html>

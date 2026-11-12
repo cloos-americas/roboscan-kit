@@ -35,40 +35,74 @@
 
 <main id="home" class="view" data-view="home">
   <section class="hero" id="top">
-    <div class="hero__text">
-      <p class="eyebrow">For structural steel shops</p>
-      <h1 class="hero__title">RoboScan for structural steel</h1>
-      <p class="lead">Videos, limits and a 5 step walkthrough. Start with what it can't do. Then see what it does.</p>
-      <ul class="stats" aria-label="In this kit">
-        <li><b>13</b> limits</li>
-        <li><b>16</b> standard connections</li>
-        <li><b>7</b> videos</li>
-      </ul>
+    <div class="hero__steel">
+      <img src="parts/cover.png" alt="Structural steel parts: stiffened beams, a plated beam, a lattice girder and a railing, welds in orange" width="2200" height="616">
     </div>
-    <div class="hero__pic">
-      <img src="media/beams-box-section.jpg" alt="CLOOS robot welding a beam section on a positioner" width="960" height="540">
+    <div class="wrap hero__text">
+      <h1 class="hero__title">Structural steel welding with RoboScan</h1>
+      <p class="lead">Beams, columns, lattice girders and railings. A CLOOS robot scans the tacked part, writes its own program and welds it. Check what it can't do first, then look at your parts.</p>
+      <p class="hero__links">
+        <a class="btn btn--primary" href="#limits">What it can't do <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h13M13 6l6 6-6 6"/></svg></a>
+<a class="btn btn--outline-light" href="#parts">See your parts</a>      </p>
     </div>
   </section>
 
   <section class="pinned wrap pinned--3" aria-label="Start here">
     <a class="pin pin--limits" href="#limits">
-      <span class="pin__num">01</span>
       <span class="pin__title">Start here: what it can't do</span>
       <span class="pin__text">13 limits and a fit checklist. Check your parts before anyone quotes.</span>
       <span class="pin__go">See the limits <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h13M13 6l6 6-6 6"/></svg></span>
     </a>
     <a class="pin pin--walk" href="#walk-1">
-      <span class="pin__num">02</span>
       <span class="pin__title">Walk a customer through it</span>
       <span class="pin__text">5 steps, about 8 minutes of video. Each step has a line to say and a line not to promise.</span>
       <span class="pin__go">Start step 1 <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h13M13 6l6 6-6 6"/></svg></span>
     </a>
     <a class="pin pin--cell" href="cell/">
-      <span class="pin__num">03</span>
       <span class="pin__title">See the cell in 3D</span>
       <span class="pin__text">Set the beam, scan it, check the joints, weld. Drag to look around. Works on a phone.</span>
       <span class="pin__go">Open the 3D cell <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h13M13 6l6 6-6 6"/></svg></span>
     </a>
+  </section>
+
+  <section class="parts wrap" id="parts" aria-labelledby="parts-title">
+    <div class="section-head">
+      <h2 id="parts-title">Your parts</h2>
+      <p class="section-head__note">Typical structural steel parts. The orange lines are the welds.</p>
+    </div>
+    <div class="parts__grid">
+      <a class="part" href="parts/#part=beam-stiffeners">
+        <span class="part__pic"><img src="parts/beam-stiffeners.png" alt="Beam with stiffeners and end plates, welds in orange" width="1345" height="547" loading="lazy"></span>
+        <span class="part__title">Beam with stiffeners and end plates</span>
+        <span class="part__codes"><b>C3</b> stiffener, <b>A1</b> head plate</span>
+      </a>
+      <a class="part" href="parts/#part=column">
+        <span class="part__pic"><img src="parts/column.png" alt="Column with base plate and shear tabs, welds in orange" width="1360" height="569" loading="lazy"></span>
+        <span class="part__title">Column with base plate and shear tabs</span>
+        <span class="part__codes"><b>A2</b> column base, <b>A1</b> head plate, <b>C2</b> shear tab</span>
+      </a>
+      <a class="part" href="parts/#part=beam-plates">
+        <span class="part__pic"><img src="parts/beam-plates.png" alt="Beam with plates on web and flange, welds in orange" width="1336" height="496" loading="lazy"></span>
+        <span class="part__title">Beam with plates on web and flange</span>
+        <span class="part__codes"><b>B1</b> reinforcing plate, <b>C1</b> plate on web, <b>C2</b> shear tab</span>
+      </a>
+      <a class="part" href="parts/#part=brace">
+        <span class="part__pic"><img src="parts/brace.png" alt="Channel brace with gusset plates, welds in orange" width="1297" height="452" loading="lazy"></span>
+        <span class="part__title">Channel brace with gusset plates</span>
+        <span class="part__codes"><b>D1</b> plate on profile, <b>D2</b> plate in profile</span>
+      </a>
+      <a class="part" href="parts/#part=truss">
+        <span class="part__pic"><img src="parts/truss.png" alt="Lattice girder, welds in orange" width="1400" height="511" loading="lazy"></span>
+        <span class="part__title">Lattice girder</span>
+        <span class="part__codes">Its own connection library</span>
+      </a>
+      <a class="part" href="parts/#part=railing">
+        <span class="part__pic"><img src="parts/railing.png" alt="Railing section, welds in orange" width="1400" height="764" loading="lazy"></span>
+        <span class="part__title">Railing section</span>
+        <span class="part__codes">Its own connection library</span>
+      </a>
+    </div>
+    <p class="parts__note">Drawn in 3D at typical sizes. <a href="parts/">Turn any part around in 3D <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h13M13 6l6 6-6 6"/></svg></a> Every real part still goes through the fit check.</p>
   </section>
 
   <section class="library wrap" id="library" aria-labelledby="library-title">
@@ -210,7 +244,7 @@
           <span class="doc__body">
             <span class="source">CLOOS</span>
             <span class="tile__title">RoboScan presentation</span>
-            <span class="doc__text">9 slides in PowerPoint: who CLOOS is, how RoboScan works, what it can't do, what it welds and the 3D cell. 3.4 MB, ready to present or send.</span>
+            <span class="doc__text">9 slides in PowerPoint: structural steel first, your parts, how RoboScan works, what it can't do, the 3D cell and who CLOOS is. 3.9 MB, ready to present or send.</span>
             <span class="doc__go">Download <svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h13M13 6l6 6-6 6"/></svg></span>
           </span>
         </a>
@@ -220,7 +254,6 @@
 
   <section class="welds" id="welds" aria-labelledby="welds-title">
     <div class="wrap">
-      <p class="eyebrow">What it welds</p>
       <h2 id="welds-title">Beams, columns, trusses, railings and gratings</h2>
       <div class="welds__beams">
         <h3>Beams and columns: 16 standard connections</h3>
@@ -619,7 +652,6 @@
   <div class="cta">
     <div class="wrap cta__in">
       <div>
-        <p class="eyebrow eyebrow--light">Before any quote</p>
         <h2>Have a part in mind?</h2>
         <p>Send a drawing or a photo to Casey Janes at JPS International. CLOOS Americas runs a fit check and tells you what works and what does not.</p>
       </div>
