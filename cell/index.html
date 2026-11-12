@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>RoboScan steel cell in 3D | Robotic Scan-and-Weld</title>
+<meta name="description" content="A step by step 3D look at a RoboScan steel cell: set the beam, scan it, check the joints, weld. Illustration, not to scale.">
+<meta property="og:title" content="RoboScan steel cell in 3D">
+<meta property="og:description" content="Set the beam, scan it, check the joints, weld. Illustration, not to scale.">
+<meta property="og:image" content="https://cameroon3426.github.io/roboscan-kit/cell/poster.jpg">
+<meta name="theme-color" content="#2e393f">
+<link rel="stylesheet" href="cell.css">
+</head>
+<body data-step="1">
+<header class="bar">
+  <a class="bar__back" href="../">&larr; <span>Back to the kit</span></a>
+  <p class="bar__name">Robotic Scan-and-Weld</p>
+  <p class="powered">powered by <b>CLOOS RoboScan</b></p>
+</header>
+
+<main class="view">
+  <div id="stage" class="stage" aria-label="3D view of a RoboScan steel cell. Drag to look around."></div>
+  <div id="tags" class="tags" aria-hidden="true"></div>
+  <p class="chip chip--note">Illustration. Not to scale.</p>
+  <p class="chip chip--sped" id="sped" hidden>Shown sped up</p>
+  <div class="loading" aria-live="polite"><span>Loading the 3D cell</span></div>
+  <div class="fallback" id="fallback">
+    <h1>The 3D view could not start</h1>
+    <p data-why>This browser has 3D turned off.</p>
+    <p><a class="btn btn--primary" href="../#walk-4">See the cell on video instead</a></p>
+  </div>
+</main>
+
+<section class="panel" aria-label="Walkthrough">
+  <ol class="chips" aria-label="Steps">
+    <li><button type="button" data-go="1"><span class="chips__n">1</span><span class="chips__t">The cell</span></button></li>
+    <li><button type="button" data-go="2"><span class="chips__n">2</span><span class="chips__t">Set the beam</span></button></li>
+    <li><button type="button" data-go="3"><span class="chips__n">3</span><span class="chips__t">Scan</span></button></li>
+    <li><button type="button" data-go="4"><span class="chips__n">4</span><span class="chips__t">Check</span></button></li>
+    <li><button type="button" data-go="5"><span class="chips__n">5</span><span class="chips__t">Weld</span></button></li>
+    <li><button type="button" data-go="6"><span class="chips__n">6</span><span class="chips__t">Your parts</span></button></li>
+  </ol>
+  <div class="panel__body">
+    <article data-step="1">
+      <p class="kicker">Step 1 of 6</p>
+      <h1>The cell</h1>
+      <p>This is an example RoboScan steel cell under a shop awning. A QIROX robot hangs from a C-frame that rolls along a floor track. The beam sits on steel stands beside it.</p>
+<p class="note">Illustration, not to scale. Your layout is drawn to your building before any quote.</p>    </article>
+    <article data-step="2" hidden>
+      <p class="kicker">Step 2 of 6</p>
+      <h1>Set the beam</h1>
+      <p>The crane sets the tacked beam on the stands. Tacks stay under 5 mm (0.20 in) and off the corners. The track has to be longer than the longest part.</p>
+    </article>
+    <article data-step="3" hidden>
+      <p class="kicker">Step 3 of 6</p>
+      <h1>Scan it</h1>
+      <p>The C-frame drives the length of the beam while the laser scanner measures it. The program is made from the scan, so nobody teaches points by hand.</p>
+    </article>
+    <article data-step="4" hidden>
+      <p class="kicker">Step 4 of 6</p>
+      <h1>Check the joints</h1>
+      <p>The scan finds the joints the laser can see. The operator checks them on the screen, then starts the weld. Joints on the far side are out of view, so the beam is turned for those.</p>
+    </article>
+    <article data-step="5" hidden>
+      <p class="kicker">Step 5 of 6</p>
+      <h1>Weld</h1>
+      <p>The robot welds each joint the scan found. The C-frame moves to the next stiffener on its own.</p>
+<p class="note">Shown sped up. Weld time depends on your part.</p>    </article>
+    <article data-step="6" hidden>
+      <p class="kicker">Step 6 of 6</p>
+      <h1>Your parts next</h1>
+      <p>Every shop and every part is different. Send a drawing or a photo to your JPS rep and we run a fit check before any quote.</p>
+      <p class="cta">
+        <a class="btn btn--primary" href="mailto:cjj@jpsint.com?subject=RoboScan%20fit%20check">Email Casey Janes</a>
+        <a class="btn btn--ghost" href="../">Back to the kit</a>
+      </p>
+    </article>
+  </div>
+  <div class="panel__ctrl">
+    <button type="button" class="btn btn--ghost" id="prev">&larr; Back</button>
+    <button type="button" class="btn btn--ghost" id="play" aria-pressed="false"><span>Pause</span></button>
+    <button type="button" class="btn btn--ghost btn--tour" id="tour" aria-pressed="false">Play all</button>
+    <button type="button" class="btn btn--primary" id="next">Next &rarr;</button>
+  </div>
+</section>
+
+<script src="vendor/three.min.js"></script>
+<script src="vendor/OrbitControls.js"></script>
+<script src="qrc410.js"></script>
+<script src="scene.js"></script>
+</body>
+</html>
