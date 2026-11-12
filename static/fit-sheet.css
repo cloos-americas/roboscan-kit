@@ -1,0 +1,111 @@
+/* RoboScan fit sheet, printed to US letter. CLOOS tokens: black-grey #2e393f, orange #db6006. */
+@font-face { font-family: "Teko"; font-weight: 300 700; src: url(fonts/Teko-latin.woff2) format("woff2"); }
+@font-face { font-family: "Cairo"; font-weight: 200 1000; src: url(fonts/Cairo-latin.woff2) format("woff2"); }
+
+@page { size: letter; margin: 0; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: "Cairo", "Segoe UI", Arial, sans-serif;
+  color: #2e393f;
+  font-size: 10.2pt;
+  line-height: 1.4;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+p { margin: 0; }
+h1, h2, h3 { margin: 0; }
+h1, h2 {
+  font-family: "Teko", "Arial Narrow", Arial, sans-serif;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  line-height: 1;
+}
+
+.page {
+  width: 8.5in;
+  height: 11in;
+  padding: 0 0.55in 0.5in;
+  position: relative;
+  overflow: hidden;
+  page-break-after: always;
+  break-after: page;
+}
+.page:last-child { page-break-after: auto; break-after: auto; }
+
+.bar {
+  margin: 0 -0.55in;
+  padding: 0.2in 0.55in 0.16in;
+  background: #2e393f;
+  color: #fff;
+  border-bottom: 4px solid #db6006;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.bar__partner { font-family: "Teko", "Arial Narrow", sans-serif; font-weight: 600; font-size: 19pt; line-height: 1; letter-spacing: .05em; text-transform: uppercase; }
+.bar__powered { font-size: 9.5pt; color: #d5d7d8; }
+.bar__powered b { color: #fff; }
+
+.eyebrow { font-weight: 700; font-size: 7.5pt; letter-spacing: .18em; text-transform: uppercase; color: #db6006; margin-bottom: 2pt; }
+.title { padding: 0.24in 0 0.16in; border-bottom: 1px solid #d5d7d8; margin-bottom: 0.16in; }
+.title h1 { font-size: 40pt; line-height: .9; margin-bottom: 4pt; }
+.title--small h1 { font-size: 26pt; }
+.lead { font-size: 10.5pt; max-width: 6.2in; }
+
+.cols { display: grid; grid-template-columns: 1.12fr 1fr; gap: 0.3in; }
+.col h2 { font-size: 19pt; margin-bottom: 4pt; padding-bottom: 3pt; border-bottom: 3px solid #2e393f; }
+.col--fit h2 { border-bottom-color: #db6006; }
+
+.numbered { list-style: none; counter-reset: n; padding: 0; margin: 0; }
+.numbered li { counter-increment: n; position: relative; padding: 5.6pt 0 5.6pt 26pt; border-bottom: 1px solid #eaebec; }
+.numbered li::before {
+  content: counter(n, decimal-leading-zero);
+  position: absolute; left: 0; top: 5.2pt;
+  font-family: "Teko", "Arial Narrow", sans-serif; font-weight: 600; font-size: 14pt; line-height: 1; color: #db6006;
+}
+
+.checklist { list-style: none; padding: 0; margin: 0; }
+.checklist li { position: relative; padding: 6pt 0 6pt 21pt; border-bottom: 1px solid #eaebec; }
+.checklist li::before { content: ""; position: absolute; left: 0; top: 7.5pt; width: 10pt; height: 10pt; border: 1.5pt solid #2e393f; }
+
+.part { margin-top: 12pt; background: #f5f6f7; padding: 8pt 10pt 4pt; }
+.part__label { font-size: 7pt; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #828a8e; }
+.part__line { height: 18pt; border-bottom: 1px solid #abb0b3; margin-bottom: 6pt; }
+
+.conns { list-style: none; padding: 0; margin: 0 0 0.2in; display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: #d5d7d8; border: 1px solid #d5d7d8; }
+.conns li { background: #fff; padding: 8pt 8pt 9pt; display: flex; align-items: baseline; gap: 7pt; }
+.conns__code { font-family: "Teko", "Arial Narrow", sans-serif; font-weight: 600; font-size: 20pt; line-height: 1; color: #db6006; min-width: 18pt; }
+.conns__name { font-size: 9.8pt; line-height: 1.2; }
+
+.sizes { display: grid; grid-template-columns: 1.15fr 1fr; gap: 0.24in; margin-bottom: 0.18in; }
+.sizes h3 { font-size: 9pt; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 3pt; }
+.sizes__table { width: 100%; border-collapse: collapse; font-size: 8.8pt; line-height: 1.25; }
+.sizes__table th, .sizes__table td { text-align: left; padding: 2.6pt 5pt 2.6pt 0; border-bottom: 1px solid #eaebec; vertical-align: top; }
+.sizes__table thead th { font-size: 6.8pt; letter-spacing: .12em; text-transform: uppercase; color: #828a8e; border-bottom: 2px solid #2e393f; }
+.sizes__table tbody th { font-weight: 700; }
+.sizes__notes { list-style: none; padding: 0; margin: 5pt 0 0; font-size: 8.4pt; line-height: 1.3; color: #585f64; }
+.sizes__notes li { position: relative; padding: 1.5pt 0 1.5pt 9pt; }
+.sizes__notes li::before { content: ""; position: absolute; left: 0; top: 5.5pt; width: 4pt; height: 4pt; background: #db6006; }
+.families { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.16in; margin-bottom: 0.2in; }
+.family { border-top: 3px solid #2e393f; padding-top: 5pt; }
+.family h3 { font-size: 9pt; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 3pt; }
+.family p { font-size: 9.4pt; color: #585f64; }
+
+.send { background: #2e393f; color: #fff; padding: 12pt 14pt 12pt; border-left: 5px solid #db6006; }
+.send h2 { font-size: 20pt; margin-bottom: 7pt; }
+.people { display: grid; grid-template-columns: 1fr 1fr; gap: 14pt; }
+.person p { font-size: 9pt; }
+.person__role { font-size: 7pt !important; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: #db6006; }
+.person__name { font-weight: 700; font-size: 10.5pt !important; }
+.send__kit { margin-top: 9pt; padding-top: 7pt; border-top: 1px solid #58616a; font-size: 9pt; color: #d5d7d8; }
+
+.foot {
+  position: absolute; left: 0.55in; right: 0.55in; bottom: 0.32in;
+  display: flex; align-items: center; gap: 10pt;
+  font-size: 8pt; color: #828a8e;
+  border-top: 1px solid #d5d7d8; padding-top: 6pt;
+}
+.foot img { height: 12pt; width: auto; }
+.foot__page { margin-left: auto; }
