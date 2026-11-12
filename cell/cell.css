@@ -24,10 +24,9 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-.bar { display: flex; align-items: center; gap: 1rem; padding: .55rem 1rem; border-bottom: 4px solid var(--orange); background: var(--bg-100); }
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .55rem 1rem; border-bottom: 4px solid var(--orange); background: var(--bg-100); }
 .bar__back { color: var(--white); text-decoration: none; font-weight: 700; white-space: nowrap; }
 .bar__back:hover span { text-decoration: underline; }
-.bar__name { margin: 0; font-family: var(--font-display); font-size: 1.6rem; line-height: 1; letter-spacing: .02em; text-transform: uppercase; flex: 1; text-align: center; }
 .powered { margin: 0; font-size: .9rem; color: var(--bg-20); white-space: nowrap; }
 .powered b { color: var(--white); }
 
@@ -88,7 +87,6 @@ body.clean { grid-template-rows: 1fr; }
 @media (max-width: 760px) {
   .bar { gap: .5rem; padding: .45rem .75rem; }
   .bar__back span { display: none; }
-  .bar__name { font-size: 1.25rem; text-align: left; }
   .powered { font-size: .75rem; }
   .panel { grid-template-columns: 1fr; grid-template-areas: "chips" "body" "ctrl"; padding: .6rem .75rem .75rem; gap: .4rem; }
   .chips__t { display: none; }

@@ -359,6 +359,8 @@
   const farMarks = FAR_SEAMS.map(s => { const m = new THREE.Mesh(tube(s, 0.009), farMat); m.visible = false; beam.add(m); return m; });
   const farHi = FAR_SEAMS.map(s => { const m = new THREE.Mesh(tube(s, 0.011), hiMat.clone()); m.visible = false; beam.add(m); return m; });
   const toWorld = (p) => beamRoot.localToWorld(p.clone());
+  const checkMat = new THREE.MeshBasicMaterial({ color: 0x2fbf55 });
+  const checks = SEAMS.map(s => { const m = new THREE.Mesh(tube(s, 0.0085), checkMat); m.visible = false; beam.add(m); return m; });
 
   // ------------------------------------------------------------------ steel stands (sawhorses)
   const stands = new THREE.Group(); scene.add(stands);
@@ -578,13 +580,13 @@
     const a = [sx, webY, zA], b = [sx, webY, zB];
     const dir = unit([-side * 0.4, -0.8, 0.2]);
     const back = (p, k) => add3(p, scl3(dir, -k));
-    const safe = ikW(add3(back(a, 0.18), [0, 0.28, 0]), dir, RELAX);
-    const pre = ikW(back(a, 0.12), dir, safe);
+    const safe = ikW(add3(back(a, 0.2), [0, 0.42, 0]), dir, RELAX);
+    const pre = ikW(back(a, 0.15), dir, safe);
     const path = [];
     let seed = pre;
     for (let i = 0; i <= 24; i++) { seed = ikW(add3(a, scl3(sub3(b, a), i / 24)), dir, seed); path.push(seed); }
-    const post = ikW(add3(back(b, 0.12), [0, 0.04, 0]), dir, seed);
-    const safeB = ikW(add3(back(b, 0.18), [0, 0.28, 0]), dir, post);
+    const post = ikW(add3(back(b, 0.15), [0, 0.06, 0]), dir, seed);
+    const safeB = ikW(add3(back(b, 0.2), [0, 0.42, 0]), dir, post);
     return { side, safe, pre, path, post, safeB };
   });
   const along = (path, u) => { const f = clamp(u, 0, 1) * (path.length - 1), i = Math.min(path.length - 2, Math.floor(f)); return lerpQ(path[i], path[i + 1], f - i); };
@@ -674,6 +676,9 @@
     screenTex.needsUpdate = true;
   }
   const person = new THREE.Group(); person.position.set(-8.4, 0, -4.05); person.rotation.y = Math.PI * 0.85; scene.add(person);
+  const PERSON_HOME = { x: -8.4, z: -4.05, ry: Math.PI * 0.85 };
+  // weld check walk: from the station into the cell (robot parked), then along the beam
+  const WALK = [[-8.4, -4.05], [-8.0, -1.4], [-3.6, -0.85], [3.7, -0.85]];
   for (const s of [-1, 1]) box(0.13, 0.82, 0.16, M.denim, s * 0.1, 0.41, 0, person);
   box(0.42, 0.6, 0.24, M.hivis, 0, 1.12, 0, person);
   for (const s of [-1, 1]) box(0.1, 0.56, 0.12, M.hivis, s * 0.27, 1.1, 0.02, person);
@@ -682,12 +687,12 @@
   helmet.position.set(0, 1.63, 0); helmet.castShadow = true; person.add(helmet);
 
   // ------------------------------------------------------------------ steps and timeline
-  // 0 cell, 1 set the beam, 2 scan, 3 check, 4 weld, 5 option: positioners, 6 your parts
+  // 0 cell, 1 set the beam, 2 scan, 3 check, 4 weld, 5 operator checks the welds, 6 option: positioners, 7 your parts
   const NEAR_N = SEAMS.length;
   const WELD_CYCLE = 9.0;
   const WELD_END = STIFF_X.length * WELD_CYCLE;
-  const DUR = [10, 8, 12.5, 7, WELD_END + 2.0, 10, 12];
-  const SPED_UP = [false, false, true, false, true, false, false];
+  const DUR = [10, 8, 12.5, 7, WELD_END + 2.0, 13, 10, 12];
+  const SPED_UP = [false, false, true, false, true, false, false, false];
   const stopX = (k, side) => STIFF_X[k] + side * WELD_DX;     // carriage stop for one joint
 
   // one stiffener cycle (seconds): joint on the -x side, then the +x side
@@ -761,20 +766,42 @@
       const n = w.done.filter(d => d >= 1).length;
       screenLines = t < WELD_END ? ['Welding', 'Joint ' + Math.min(NEAR_N, (w.active >= 0 ? w.active + 1 : n + 1)) + ' of ' + NEAR_N] : ['Done', NEAR_N + ' of ' + NEAR_N + ' joints welded'];
     }
+    let walker = null, checked = 0;
     if (step === 5) {
+      // the robot parks, then the operator walks the beam and checks every weld by hand
       x = lerp(stopX(STIFF_X.length - 1, 1), PARK_X, ease(seg(t, 0, 2.5)));
+      doneArr.fill(1); cloudN = 0;
+      const legs = [];
+      for (let i = 1; i < WALK.length; i++) legs.push(Math.hypot(WALK[i][0] - WALK[i - 1][0], WALK[i][1] - WALK[i - 1][1]));
+      const inLen = legs[0] + legs[1], total = inLen + legs[2];
+      const d = t < 2.5 ? 0 : (t < 6.0 ? inLen * ease(seg(t, 2.5, 6.0)) : inLen + legs[2] * seg(t, 6.0, 12.0));
+      let k = 0, rem = d;
+      while (k < legs.length - 1 && rem > legs[k]) { rem -= legs[k]; k++; }
+      const f = clamp(rem / legs[k], 0, 1);
+      const px = lerp(WALK[k][0], WALK[k + 1][0], f), pz = lerp(WALK[k][1], WALK[k + 1][1], f);
+      const moving = t > 2.5 && d < total - 1e-3;
+      const ry = k < 2 ? Math.atan2(WALK[k + 1][0] - WALK[k][0], WALK[k + 1][1] - WALK[k][1]) : Math.PI * 0.12;   // walking, then facing the beam
+      walker = { x: px, z: pz, ry: t < 2.5 ? PERSON_HOME.ry : ry, bob: moving ? Math.abs(Math.sin(wall * 7)) * 0.025 : 0 };
+      checked = t < 6.0 ? -99 : px + 0.25;
+      screenLines = t < 2.5 ? ['Robot parked', 'Safe to enter the cell'] : (t < 12.2 ? ['Weld check', 'Operator inspects by hand'] : ['Welds checked', 'Touch up if needed']);
+    }
+    if (step === 6) {
+      x = PARK_X;
       doneArr.fill(1); cloudN = 0;
       showPos = true; showStands = false;
       flip = Math.PI * ease(seg(t, 2.0, 6.5));
       farLit = t > 6.6 ? 1 : 0;
       screenLines = t < 2 ? ['Positioner option', 'Beam held in two rings'] : (t < 6.6 ? ['Turning the beam', Math.round(seg(t, 2.0, 6.5) * 180) + ' degrees'] : ['Turned', 'Other side faces the robot']);
     }
-    if (step === 6) {
+    if (step === 7) {
       x = PARK_X; doneArr.fill(1); cloudN = 0;
       screenLines = ['Done', 'Ready for the next part'];
     }
 
     // apply
+    if (walker) { person.position.set(walker.x, walker.bob, walker.z); person.rotation.y = walker.ry; }
+    else { person.position.set(PERSON_HOME.x, 0, PERSON_HOME.z); person.rotation.y = PERSON_HOME.ry; }
+    checks.forEach((m, i) => { m.visible = step === 5 && SEAMS[i].a.x < checked; });
     cframe.position.x = x;
     setRobot(q);
     beamRoot.position.y = beamY;
@@ -886,7 +913,8 @@
       case 2: return { pos: V(x * 0.6 + 2.4, 3.6, 3.6), tgt: V(x - 0.4, 1.4, -0.9) };
       case 3: return { pos: V(-0.2, 3.5, -3.6), tgt: V(-2.8, 1.1, -0.5) };
       case 4: return { pos: V(x + 3.0, 3.1, -3.7), tgt: V(x - 0.5, 1.25, -0.6) };
-      case 5: return { pos: V(7.4, 2.6, 3.4), tgt: V(2.6, 0.95, 0) };
+      case 5: { const px = person.position.x; return { pos: V(px - 2.2, 3.5, -2.9), tgt: V(px + 0.9, 0.9, -0.1) }; }
+      case 6: return { pos: V(7.4, 2.6, 3.4), tgt: V(2.6, 0.95, 0) };
       default: { const a = 0.1 * Math.sin(t * 0.09) - 0.7; return { pos: V(Math.sin(a) * 12.5, 4.0, Math.cos(a) * 11.5), tgt: V(0.4, 1.3, -1.6) }; }
     }
   }
@@ -908,8 +936,9 @@
     { id: 'scanner', text: 'Laser scanner on the C-frame', at: () => scanner.getWorldPosition(new THREE.Vector3()), steps: [2] },
     { id: 'found', text: 'Joints the scan found', at: beamPt(SEAMS[1].b.x, SEAMS[1].b.y, 0), steps: [3] },
     { id: 'far', text: 'Underside: not in view, turn the beam', at: beamPt(FAR_SEAMS[3].a.x, -hb, -hd), steps: [3] },
-    { id: 'rings', text: 'Ring positioners (option)', at: () => V(POS_X[1], BEAM.cy + RING_R1 + 0.05, 0), steps: [5] },
-    { id: 'turned', text: 'Other side now faces the robot', at: beamPt(FAR_SEAMS[5].a.x, FAR_SEAMS[5].a.y, 0), steps: [5] },
+    { id: 'inspect', text: 'Operator checks every weld', at: () => person.localToWorld(V(0, 1.9, 0)), steps: [5] },
+    { id: 'rings', text: 'Ring positioners (option)', at: () => V(POS_X[1], BEAM.cy + RING_R1 + 0.05, 0), steps: [6] },
+    { id: 'turned', text: 'Other side now faces the robot', at: beamPt(FAR_SEAMS[5].a.x, FAR_SEAMS[5].a.y, 0), steps: [6] },
   ];
   TAGS.forEach(tg => {
     const el = document.createElement('div');
@@ -926,6 +955,7 @@
       if (tg.id === 'tracklen' || tg.id === 'tacks') show = show && t > 5.6;
       if (tg.id === 'scanner') show = show && t > 1.0;
       if (tg.id === 'turned') show = show && t > 6.6;
+      if (tg.id === 'inspect') show = show && t > 2.5;
       if (!show) { tg.el.classList.remove('on'); continue; }
       const p = tg.at().project(camera);
       if (p.z > 1 || p.x < -1.1 || p.x > 1.1 || p.y < -1.1 || p.y > 1.1) { tg.el.classList.remove('on'); continue; }
