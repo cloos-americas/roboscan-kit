@@ -1,5 +1,7 @@
 // RoboScan steel cell in 3D: a QIROX QRC410 hanging from a C-frame that rolls on a floor track,
-// a tacked W-beam on steel stands, all under a shop awning. Illustration, not to scale.
+// a tacked W-beam lying web flat on steel stands, inside a closed shop bay (front wall cut away).
+// The C-frame is the real CLOOS RP-C geometry, the laser scanner rides on the C-frame, and ring
+// positioners appear as an option. Illustration, not to scale.
 //
 // Everything on screen is a pure function of (step, t): setState() poses the whole scene for any
 // step and time, so the page can jump to any step, and build tools can grab an exact frame with
@@ -30,16 +32,25 @@
   const V = (x, y, z) => new THREE.Vector3(x, y, z);
 
   // ------------------------------------------------------------------ layout (metres, y up)
-  const BEAM = { L: 9.0, d: 0.46, bf: 0.19, tf: 0.016, tw: 0.0105, y0: 0.76 };
-  BEAM.top = BEAM.y0 + BEAM.d;
+  // The beam lies web flat (flanges stand up as walls), the way RoboScan steel cells load it: the
+  // scanner looks down at the web and every stiffener joint on it. The beam turns about its own
+  // axis (x) through the web centre.
+  const BEAM = { L: 9.0, d: 0.46, bf: 0.28, tf: 0.018, tw: 0.011, y0: 0.86 };
+  BEAM.cy = BEAM.y0 + BEAM.bf / 2;                  // web centre height (turning axis)
+  BEAM.top = BEAM.y0 + BEAM.bf;                     // top of the flanges
   const STIFF_X = [-3.0, -1.0, 1.0, 3.0];
   const STIFF_T = 0.012;
-  const STANDS_X = [-4.0, -2.0, 0, 2.0, 4.0];
-  const TRACK = { x0: -6.6, x1: 6.6, z: -2.1 };
-  const MOUNT = { y: 2.85, z: -1.0 };            // robot base (top of base casting) under the boom tip
-  const PARK_X = 5.4;
-  const SCAN_X0 = 5.0, SCAN_X1 = -5.0;   // scan runs from the park end to the far end
-  const ROOF = { x0: -10.2, x1: 10.2, zBack: -5.6, zFront: 5.0, yBack: 5.9, yFront: 5.1 };
+  const STANDS_X = [-3.9, -2.0, 0, 2.0, 3.9];
+  const POS_X = [-4.25, 4.25];                      // ring positioners (option step)
+  const CF = window.CFRAME;
+  const MOUNT = { y: 2.6, z: -1.2 };                // robot mount under the boom tip, 2.4 m reach from the column
+  const CARRIAGE_TOP = 0.42;                        // floor track 0.28 m + carriage 0.14 m
+  const TRACK = { x0: -7.2, x1: 7.2, z: MOUNT.z + (CF ? CF.columnZ : -2.4) };
+  const SCAN_OFF = -0.55;                           // scanner sits 0.55 m from the robot along the boom tip
+  const PARK_X = 5.6;
+  const SCAN_X0 = 5.1, SCAN_X1 = -4.0;              // carriage travel while scanning (scanner covers the whole beam)
+  const WELD_DX = 0.45;                             // the robot stands this far to the open side of each joint
+  const ROOF = { x0: -13, x1: 13, zBack: -8, zFront: 6.5, yBack: 8.0, yFront: 7.0 };   // the hall
 
   // ------------------------------------------------------------------ renderer, scene, camera
   const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -133,8 +144,8 @@
     g.globalAlpha = 1;
   }
   const concreteTex = canvasTex(512, 512, (g, w, h) => {
-    g.fillStyle = '#b8b5ad'; g.fillRect(0, 0, w, h);
-    noise(g, w, h, 9000, 0.35, ['#9f9c94', '#cfccc4', '#a8a59d']);
+    g.fillStyle = '#8f8e89'; g.fillRect(0, 0, w, h);
+    noise(g, w, h, 9000, 0.35, ['#7d7c78', '#a3a29d', '#878681']);
     g.strokeStyle = 'rgba(70,68,64,0.55)'; g.lineWidth = 2;
     g.beginPath(); g.moveTo(0, 1); g.lineTo(w, 1); g.moveTo(1, 0); g.lineTo(1, h); g.stroke();
   }, [7, 4]);
@@ -209,8 +220,8 @@
   // ------------------------------------------------------------------ ground, pad, yard
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshStandardMaterial({ map: asphaltTex, roughness: 0.95 }));
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
-  const pad = new THREE.Mesh(new THREE.BoxGeometry(22, 0.04, 13), new THREE.MeshStandardMaterial({ map: concreteTex, roughness: 0.9 }));
-  pad.position.set(0, 0.02, -0.3); pad.receiveShadow = true; scene.add(pad);
+  const pad = new THREE.Mesh(new THREE.BoxGeometry(26, 0.04, 14.5), new THREE.MeshStandardMaterial({ map: concreteTex, roughness: 0.9 }));
+  pad.position.set(0, 0.02, -0.75); pad.receiveShadow = true; scene.add(pad);
   // painted floor: yellow cell boundary and a hatched walkway at the operator side
   const paint = mat(0xe8b511, { roughness: 0.8 });
   function floorLine(x0, z0, x1, z1, wdt = 0.1) {
@@ -219,73 +230,87 @@
     m.rotation.x = -Math.PI / 2; m.rotation.z = -Math.atan2(z1 - z0, x1 - x0);
     m.position.set((x0 + x1) / 2, 0.042, (z0 + z1) / 2); m.receiveShadow = true; scene.add(m);
   }
-  const CB = { x0: -7.4, x1: 7.4, z0: -3.6, z1: 1.3 };
+  const CB = { x0: -7.7, x1: 7.7, z0: -5.2, z1: 1.4 };
   floorLine(CB.x0, CB.z0, CB.x1, CB.z0); floorLine(CB.x0, CB.z1, CB.x1, CB.z1);
   floorLine(CB.x0, CB.z0, CB.x0, CB.z1); floorLine(CB.x1, CB.z0, CB.x1, CB.z1);
-  for (let i = 0; i < 9; i++) floorLine(-9.4 + i * 0.25, -3.6, -9.0 + i * 0.25, -2.0, 0.07);
+  for (let i = 0; i < 9; i++) floorLine(-10.0 + i * 0.25, -5.2, -9.6 + i * 0.25, -3.4, 0.07);
 
-  // shop building behind the yard, roll-up door and windows
-  const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.7, metalness: 0.2 });
-  box(70, 11, 0.4, wallMat, 0, 5.5, -17, null, false);
-  box(6.5, 6.5, 0.1, mat(0x8f979c, { metalness: 0.4 }), -6, 3.25, -16.75, null, false);
-  box(6.5, 0.4, 0.15, M.orange, -6, 6.7, -16.72, null, false);
-  for (let i = 0; i < 6; i++) box(3, 1.2, 0.08, mat(0x55707f, { metalness: 0.6, roughness: 0.15 }), 4 + i * 4.2, 8.2, -16.75, null, false);
-  box(70, 0.5, 0.6, M.frame, 0, 11.1, -17, null, false);
+  // neighbouring buildings fill the view out of the cut-away front, so nothing reads as an open yard
+  const farWall = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.8, metalness: 0.15, color: 0xb9c0c5 });
+  box(90, 12, 0.6, farWall, 0, 6, 26, null, false);
+  box(0.6, 12, 60, farWall, -40, 6, 0, null, false);
+  box(0.6, 12, 60, farWall, 40, 6, 0, null, false);
+  for (const x of [-18, 0, 18]) box(7, 6, 0.2, mat(0x8f979c, { metalness: 0.4 }), x, 3, 25.6, null, false);
 
-  // steel stock on dunnage in the yard
+  // ------------------------------------------------------------------ enclosed shop bay
+  // RoboScan is not made for outdoors: the cell sits inside a closed, lit hall. The front wall is
+  // cut away (and labelled so) so the viewer can see in; the other three walls and the roof are whole.
+  const hall = new THREE.Group(); scene.add(hall);
+  const roofY = z => lerp(ROOF.yBack, ROOF.yFront, (z - ROOF.zBack) / (ROOF.zFront - ROOF.zBack));
+  const wallMat = new THREE.MeshStandardMaterial({ map: wallTex, roughness: 0.7, metalness: 0.2, side: THREE.DoubleSide });
+  const W = ROOF.x1 - ROOF.x0, Dz = ROOF.zFront - ROOF.zBack;
+  const backWall = new THREE.Mesh(new THREE.PlaneGeometry(W, ROOF.yBack), wallMat);
+  backWall.position.set(0, ROOF.yBack / 2, ROOF.zBack); backWall.receiveShadow = true; hall.add(backWall);
+  for (const sx of [-1, 1]) {   // side walls follow the roof slope
+    const g = new THREE.Shape();
+    g.moveTo(ROOF.zBack, 0); g.lineTo(ROOF.zFront, 0); g.lineTo(ROOF.zFront, ROOF.yFront); g.lineTo(ROOF.zBack, ROOF.yBack); g.closePath();
+    const wm = new THREE.Mesh(new THREE.ShapeGeometry(g), wallMat);
+    wm.rotation.y = -Math.PI / 2; wm.position.set(sx * W / 2, 0, 0); wm.receiveShadow = true; hall.add(wm);
+    // cut edge trim on the open front
+    box(0.12, ROOF.yFront, 0.12, M.frame, sx * W / 2, ROOF.yFront / 2, ROOF.zFront, hall, false);
+  }
+  box(W + 0.12, 0.25, 0.12, M.orange, 0, ROOF.yFront - 0.12, ROOF.zFront, hall, false);
+  // closed roll-up door and a man door in the right wall, wall heater on the back wall
+  box(0.1, 5.2, 5.0, mat(0x8f979c, { metalness: 0.4, roughness: 0.5 }), W / 2 - 0.06, 2.6, -1.5, hall, false);
+  for (let i = 1; i < 12; i++) box(0.11, 0.02, 5.0, M.column, W / 2 - 0.07, i * 0.43, -1.5, hall, false);
+  box(0.1, 2.2, 1.0, M.orange, W / 2 - 0.06, 1.1, 3.6, hall, false);
+  const heater = new THREE.Group(); heater.position.set(-6.5, 5.0, ROOF.zBack + 0.45); hall.add(heater);
+  box(1.0, 0.7, 0.6, M.white, 0, 0, 0, heater, false);
+  for (let i = 0; i < 5; i++) box(0.9, 0.03, 0.02, M.frameLite, 0, -0.25 + i * 0.12, 0.31, heater, false);
+  // high windows in the back wall
+  for (let i = 0; i < 7; i++) box(2.4, 0.9, 0.06, mat(0x9fb6c6, { metalness: 0.6, roughness: 0.15 }), -10.5 + i * 3.5, ROOF.yBack - 1.2, ROOF.zBack + 0.04, hall, false);
+  // portal frames: columns on the walls, rafters across, purlins along
+  for (let x = ROOF.x0 + 0.2; x <= ROOF.x1; x += (W - 0.4) / 4) {
+    for (const z of [ROOF.zBack + 0.2]) {
+      const h = roofY(z) - 0.2;
+      const c = wShape(h, 0.36, 0.3, 0.016, 0.01, M.column, hall, false);
+      c.rotation.x = Math.PI / 2; c.position.set(x, h / 2, z);
+    }
+    strut(V(x, roofY(ROOF.zBack) - 0.25, ROOF.zBack), V(x, roofY(ROOF.zFront) - 0.25, ROOF.zFront), 0.3, M.column, hall);
+  }
+  for (let z = ROOF.zBack + 0.6; z < ROOF.zFront; z += 1.5) box(W, 0.14, 0.09, M.column, 0, roofY(z) - 0.08, z, hall, false);
+  const roofMat = new THREE.MeshStandardMaterial({ map: roofTex, roughness: 0.6, metalness: 0.3, side: THREE.DoubleSide, transparent: true, opacity: 1 });
+  const slope = Math.atan2(ROOF.yBack - ROOF.yFront, Dz);
+  const roof = new THREE.Mesh(new THREE.PlaneGeometry(W + 0.4, Math.hypot(Dz, ROOF.yBack - ROOF.yFront) + 0.4), roofMat);
+  roof.rotation.x = -Math.PI / 2 + slope;
+  roof.position.set(0, (ROOF.yBack + ROOF.yFront) / 2 + 0.03, (ROOF.zBack + ROOF.zFront) / 2);
+  roof.receiveShadow = true;
+  hall.add(roof);
+  // LED high bays
+  const ledMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff6e5, emissiveIntensity: 1.2 });
+  for (const x of [-9, -3, 3, 9]) for (const z of [-4.5, 0.5, 4.5]) {
+    const l = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.08, 20), ledMat);
+    l.position.set(x, roofY(z) - 0.6, z); hall.add(l);
+  }
+  const under = new THREE.PointLight(0xfff3e0, 0.4, 22, 1.4); under.position.set(0, 5.5, -0.8); scene.add(under);
+
+  // steel stock on dunnage along the back wall
   function stockPile(x, z, n, layers) {
     for (let l = 0; l < layers; l++) {
-      for (const dz of [-1.6, 1.6]) box(0.12, 0.12, 0.2 + n * 0.32, mat(0x7b5a3a, { roughness: 0.9 }), x + dz, 0.06 + l * 0.42, z, null);
+      for (const dz of [-2.6, 0, 2.6]) box(0.12, 0.12, 0.2 + n * 0.32, mat(0x7b5a3a, { roughness: 0.9 }), x + dz, 0.06 + l * 0.42, z, null);
       for (let i = 0; i < n; i++) {
         const b = wShape(7, 0.3, 0.15, 0.012, 0.008, M.millscale, null, true);
-        b.rotation.y = 0; b.position.set(x, 0.27 + l * 0.42, z - (n - 1) * 0.16 + i * 0.32);
+        b.position.set(x, 0.27 + l * 0.42, z - (n - 1) * 0.16 + i * 0.32);
       }
     }
   }
-  stockPile(15.5, -1.0, 4, 2);
-  stockPile(15.5, 3.6, 3, 1);
+  stockPile(6.0, ROOF.zBack + 1.4, 3, 2);
 
-  // ------------------------------------------------------------------ awning
-  const awning = new THREE.Group(); scene.add(awning);
-  const roofY = z => lerp(ROOF.yBack, ROOF.yFront, (z - ROOF.zBack) / (ROOF.zFront - ROOF.zBack));
-  const colX = [-9.6, -3.2, 3.2, 9.6], colZ = [-5.2, 4.6];
-  for (const x of colX) {
-    for (const z of colZ) {
-      const h = roofY(z) - 0.25;
-      const c = wShape(h, 0.3, 0.3, 0.016, 0.01, M.column, awning, false);
-      c.rotation.x = Math.PI / 2; c.position.set(x, h / 2, z);
-      box(0.5, 0.03, 0.5, M.column, x, 0.055, z, awning);
-    }
-    // rafter along the slope
-    const a = V(x, roofY(colZ[0] - 0.6) - 0.18, colZ[0] - 0.6), b = V(x, roofY(colZ[1] + 0.6) - 0.18, colZ[1] + 0.6);
-    strut(a, b, 0.24, M.column, awning);
-  }
-  for (let z = ROOF.zBack + 0.3; z < ROOF.zFront; z += 1.25) {
-    box(ROOF.x1 - ROOF.x0, 0.12, 0.08, M.column, 0, roofY(z) - 0.03, z, awning);
-  }
-  const roofMat = new THREE.MeshStandardMaterial({ map: roofTex, roughness: 0.55, metalness: 0.35, side: THREE.DoubleSide, transparent: true, opacity: 1 });
-  const slope = Math.atan2(ROOF.yBack - ROOF.yFront, ROOF.zFront - ROOF.zBack);
-  const roofLen = Math.hypot(ROOF.zFront - ROOF.zBack, ROOF.yBack - ROOF.yFront);
-  const roof = new THREE.Mesh(new THREE.PlaneGeometry(ROOF.x1 - ROOF.x0, roofLen), roofMat);
-  roof.rotation.x = -Math.PI / 2 + slope;
-  roof.position.set(0, (ROOF.yBack + ROOF.yFront) / 2 + 0.04, (ROOF.zBack + ROOF.zFront) / 2);
-  roof.castShadow = true; roof.receiveShadow = true;
-  awning.add(roof);
-  const fascia = box(ROOF.x1 - ROOF.x0 + 0.1, 0.32, 0.08, M.orange, 0, ROOF.yFront - 0.1, ROOF.zFront + 0.02, awning);
-  box(ROOF.x1 - ROOF.x0 + 0.1, 0.3, 0.08, M.frame, 0, ROOF.yBack - 0.1, ROOF.zBack - 0.02, awning);
-  // LED high bays under the roof
-  const ledMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff6e5, emissiveIntensity: 1.2 });
-  for (const x of [-6.4, 0, 6.4]) for (const z of [-2.4, 1.6]) {
-    const l = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.08, 20), ledMat);
-    l.position.set(x, roofY(z) - 0.35, z); awning.add(l);
-  }
-  const under = new THREE.PointLight(0xfff3e0, 0.45, 18, 1.6); under.position.set(0, 4.4, -0.8); scene.add(under);
-
-  // monorail hoist over the stands
-  const railY = 4.55;
-  const mono = wShape(11, 0.3, 0.15, 0.014, 0.009, M.yellow, awning, true);
+  // monorail hoist over the stands, hung from the rafters
+  const railY = 5.9;
+  const mono = wShape(11, 0.3, 0.15, 0.014, 0.009, M.yellow, hall, true);
   mono.position.set(0, railY, 0);
-  for (const x of [-4.8, 0, 4.8]) strut(V(x, railY + 0.15, 0), V(x, roofY(0) - 0.05, 0), 0.08, M.column, awning);
+  for (const x of [-4.8, 0, 4.8]) strut(V(x, railY + 0.15, 0), V(x, roofY(0) - 0.3, 0), 0.08, M.column, hall);
   const hoist = new THREE.Group(); scene.add(hoist);
   box(0.5, 0.35, 0.5, M.yellow, 0, railY - 0.33, 0, hoist);
   box(0.36, 0.22, 0.36, M.frame, 0, railY - 0.6, 0, hoist);
@@ -300,103 +325,115 @@
   for (const x of [-2.6, 2.6]) for (const s of [-1, 1]) slings.push({ x, s, mesh: strut(V(0, 0, 0), V(0, 1, 0), 0.035, slingMat, spreader) });
   const topSlings = [-1.2, 1.2].map(x => ({ x, mesh: strut(V(0, 0, 0), V(0, 1, 0), 0.035, slingMat, crane) }));
 
-  // ------------------------------------------------------------------ the beam (W-shape with stiffeners)
-  const beam = new THREE.Group(); scene.add(beam);
-  wShape(BEAM.L, BEAM.d, BEAM.bf, BEAM.tf, BEAM.tw, M.millscale, beam, true).position.y = BEAM.d / 2;
-  const stiffH = BEAM.d - 2 * BEAM.tf, stiffW = BEAM.bf / 2 - BEAM.tw / 2;
-  for (const x of STIFF_X) for (const s of [-1, 1]) {
-    box(STIFF_T, stiffH, stiffW, M.plate, x, BEAM.d / 2, s * (BEAM.tw / 2 + stiffW / 2), beam);
-  }
-  for (const s of [-1, 1]) box(0.016, BEAM.d + 0.04, BEAM.bf + 0.06, M.steel, s * (BEAM.L / 2 + 0.008), BEAM.d / 2, 0, beam);
-  // tacks (beam frame): two small tacks at each near side seam
-  const SEAMS = [];   // near side, in beam frame: {x, side, a, b}
+  // ------------------------------------------------------------------ the beam (web flat, stiffeners both sides)
+  // beamRoot sits on the turning axis (web centre). Beam frame: x along the beam, y up through the
+  // web, z across (flanges at z = +-d/2). Upper side joints are welded; the underside is "the other side".
+  const beamRoot = new THREE.Group(); scene.add(beamRoot);
+  beamRoot.position.set(0, BEAM.cy, 0);
+  const beam = new THREE.Group(); beamRoot.add(beam);
+  const hw = BEAM.tw / 2, hb = BEAM.bf / 2, hd = BEAM.d / 2, T = BEAM.tf;
+  box(BEAM.L, BEAM.tw, BEAM.d - 2 * T, M.millscale, 0, 0, 0, beam);                       // web (flat)
+  for (const s of [-1, 1]) box(BEAM.L, BEAM.bf, T, M.millscale, 0, 0, s * (hd - T / 2), beam);   // flanges (walls)
+  for (const s of [-1, 1]) box(0.016, BEAM.bf + 0.04, BEAM.d + 0.04, M.plate, s * (BEAM.L / 2 + 0.008), 0, 0, beam);   // end plates
+  const stiffH = hb - hw - 0.006, stiffW = BEAM.d - 2 * T;
+  for (const x of STIFF_X) for (const s of [-1, 1]) box(STIFF_T, stiffH, stiffW, M.plate, x, s * (hw + stiffH / 2), 0, beam);
+  // joints: stiffener to web fillets, one each side of every stiffener, near flange to far flange
+  const SEAMS = [], FAR_SEAMS = [];
+  const zA = -(hd - T - 0.035), zB = hd - T - 0.035;
   for (const x of STIFF_X) for (const side of [-1, 1]) {
-    const sx = x + side * (STIFF_T / 2 + 0.002), sz = -BEAM.tw / 2 - 0.002;
-    SEAMS.push({ x, side, a: V(sx, BEAM.tf + 0.04, sz), b: V(sx, BEAM.d - BEAM.tf - 0.05, sz) });
-    for (const y of [BEAM.tf + 0.012, BEAM.d - BEAM.tf - 0.014]) box(0.006, 0.014, 0.006, M.tack, sx, y, sz, beam, false);
+    const sx = x + side * (STIFF_T / 2 + 0.003);
+    SEAMS.push({ x, side, a: V(sx, hw + 0.003, zA), b: V(sx, hw + 0.003, zB) });
+    FAR_SEAMS.push({ a: V(sx, -hw - 0.003, zA), b: V(sx, -hw - 0.003, zB) });
+    for (const z of [zA - 0.012, zB + 0.012]) {
+      box(0.006, 0.006, 0.014, M.tack, sx, hw + 0.003, z, beam, false);
+      box(0.006, 0.006, 0.014, M.tack, sx, -hw - 0.003, z, beam, false);
+    }
   }
-  const FAR_SEAMS = [];
-  for (const x of STIFF_X) for (const side of [-1, 1]) {
-    const sx = x + side * (STIFF_T / 2 + 0.002), sz = BEAM.tw / 2 + 0.002;
-    FAR_SEAMS.push({ a: V(sx, BEAM.tf + 0.04, sz), b: V(sx, BEAM.d - BEAM.tf - 0.05, sz) });
-  }
-
-  // weld beads, seam highlights (beam frame)
   const TUBE_SEG = 40, TUBE_RAD = 6;
-  const beads = SEAMS.map(s => {
-    const geo = new THREE.TubeGeometry(new THREE.LineCurve3(s.a, s.b), TUBE_SEG, 0.0055, TUBE_RAD, false);
-    const m = new THREE.Mesh(geo, M.bead); m.castShadow = false; beam.add(m); m.visible = false;
-    return m;
-  });
-  const hiMat = new THREE.MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: 0.95, depthTest: true });
-  const highlights = SEAMS.map(s => {
-    const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(s.a, s.b), 8, 0.013, 8, false), hiMat.clone());
-    beam.add(m); m.visible = false; return m;
-  });
-  const farMat = new THREE.MeshBasicMaterial({ color: 0x9aa3a8, transparent: true, opacity: 0.6 });
-  const farMarks = FAR_SEAMS.map(s => {
-    const m = new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(s.a, s.b), 8, 0.01, 6, false), farMat);
-    beam.add(m); m.visible = false; return m;
-  });
+  const tube = (s, r, seg = 8, rad = 8) => new THREE.TubeGeometry(new THREE.LineCurve3(s.a, s.b), seg, r, rad, false);
+  const beads = SEAMS.map(s => { const m = new THREE.Mesh(tube(s, 0.0055, TUBE_SEG, TUBE_RAD), M.bead); m.visible = false; beam.add(m); return m; });
+  const farBeads = FAR_SEAMS.map(s => { const m = new THREE.Mesh(tube(s, 0.0055, 8, 6), M.bead); m.visible = false; beam.add(m); return m; });
+  const hiMat = new THREE.MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: 0.95 });
+  const highlights = SEAMS.map(s => { const m = new THREE.Mesh(tube(s, 0.011), hiMat.clone()); m.visible = false; beam.add(m); return m; });
+  const farMat = new THREE.MeshBasicMaterial({ color: 0x9aa3a8, transparent: true, opacity: 0.75 });
+  const farMarks = FAR_SEAMS.map(s => { const m = new THREE.Mesh(tube(s, 0.009), farMat); m.visible = false; beam.add(m); return m; });
+  const farHi = FAR_SEAMS.map(s => { const m = new THREE.Mesh(tube(s, 0.011), hiMat.clone()); m.visible = false; beam.add(m); return m; });
+  const toWorld = (p) => beamRoot.localToWorld(p.clone());
 
   // ------------------------------------------------------------------ steel stands (sawhorses)
+  const stands = new THREE.Group(); scene.add(stands);
   for (const x of STANDS_X) {
-    const g = new THREE.Group(); g.position.set(x, 0, 0); scene.add(g);
+    const g = new THREE.Group(); g.position.set(x, 0, 0); stands.add(g);
     const top = BEAM.y0;
-    box(0.16, 0.08, 0.9, M.yellow, 0, top - 0.04, 0, g);
-    box(0.2, 0.012, 0.3, M.black, 0, top - 0.006 + 0.006, 0, g, false);
+    box(0.16, 0.08, 0.95, M.yellow, 0, top - 0.04, 0, g);
+    for (const sz of [-1, 1]) box(0.2, 0.012, 0.12, M.black, 0, top + 0.006 - 0.006, sz * (hd - T / 2), g, false);
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-      strut(V(sx * 0.05, top - 0.08, sz * 0.32), V(sx * 0.3, 0.04, sz * 0.46), 0.06, M.yellow, g);
-      box(0.12, 0.02, 0.12, M.black, sx * 0.3, 0.05, sz * 0.46, g);
+      strut(V(sx * 0.05, top - 0.08, sz * 0.34), V(sx * 0.3, 0.04, sz * 0.48), 0.06, M.yellow, g);
+      box(0.12, 0.02, 0.12, M.black, sx * 0.3, 0.05, sz * 0.48, g);
     }
-    for (const sz of [-1, 1]) strut(V(-0.24, 0.25, sz * 0.43), V(0.24, 0.25, sz * 0.43), 0.04, M.yellow, g);
+    for (const sz of [-1, 1]) strut(V(-0.24, 0.25, sz * 0.45), V(0.24, 0.25, sz * 0.45), 0.04, M.yellow, g);
   }
 
-  // ------------------------------------------------------------------ floor track
+  // ------------------------------------------------------------------ ring positioners (option)
+  const cfMat = mat(0x141719, { metalness: 0.3, roughness: 0.55 });   // CLOOS black (C-frame, positioners)
+  // "Pac-Man" rings: an open ring the crane drops the beam into, turned on rollers in a base.
+  const positioners = new THREE.Group(); scene.add(positioners);
+  const rings = [];
+  const RING_R0 = 0.35, RING_R1 = 0.52, MOUTH = 1.05;           // inner, outer radius, mouth opening (rad)
+  for (const x of POS_X) {
+    const g = new THREE.Group(); g.position.set(x, 0, 0); positioners.add(g);
+    // base with two support rollers and a drive box
+    box(0.46, 0.2, 1.4, cfMat, 0, 0.1, 0, g);
+    box(0.32, 0.36, 0.2, cfMat, 0, 0.36, -0.5, g);
+    box(0.32, 0.36, 0.2, cfMat, 0, 0.36, 0.5, g);
+    for (const z of [-0.34, 0.34]) {
+      const r = cyl(0.11, 0.3, M.rail, 0, BEAM.cy - Math.sqrt(Math.max(0, (RING_R1 + 0.11) ** 2 - z * z)), z, g, 20);
+      r.rotation.z = Math.PI / 2;
+    }
+    box(0.28, 0.28, 0.28, M.orange, 0, 0.34, -0.78, g);         // drive
+    // the ring: annulus with a mouth, extruded along x
+    const sh = new THREE.Shape();
+    const a0 = Math.PI / 2 + MOUTH / 2, a1 = Math.PI / 2 - MOUTH / 2 + Math.PI * 2;
+    sh.absarc(0, 0, RING_R1, a0, a1, false);
+    sh.absarc(0, 0, RING_R0, a1, a0, true);
+    const geo = new THREE.ExtrudeGeometry(sh, { depth: 0.16, bevelEnabled: false, curveSegments: 48 });
+    geo.translate(0, 0, -0.08);
+    const ringPivot = new THREE.Group(); ringPivot.position.set(0, BEAM.cy, 0); g.add(ringPivot);
+    const ring = new THREE.Mesh(geo, cfMat); ring.rotation.y = Math.PI / 2; ring.castShadow = true; ring.receiveShadow = true;
+    ringPivot.add(ring);
+    const band = new THREE.Shape();
+    band.absarc(0, 0, RING_R1 + 0.002, a0, a1, false);
+    band.absarc(0, 0, RING_R1 - 0.06, a1, a0, true);
+    const bandGeo = new THREE.ExtrudeGeometry(band, { depth: 0.17, bevelEnabled: false, curveSegments: 48 });
+    bandGeo.translate(0, 0, -0.085);
+    const bm = new THREE.Mesh(bandGeo, M.orange); bm.rotation.y = Math.PI / 2; ringPivot.add(bm);
+    // clamp jaws that hold the beam (move with the ring)
+    for (const s of [-1, 1]) box(0.14, 0.08, RING_R0 - hd + 0.02, M.frame, 0, 0, s * (hd + (RING_R0 - hd) / 2), ringPivot);
+    box(0.14, RING_R0 - hb + 0.02, 0.1, M.frame, 0, -(hb + (RING_R0 - hb) / 2), 0, ringPivot);   // bottom jaw (the mouth is open on top)
+    rings.push(ringPivot);
+  }
+  positioners.visible = false;
+
+  // ------------------------------------------------------------------ floor track (CLOOS floor track: covered, rack and drag chain)
   const track = new THREE.Group(); scene.add(track);
   const tLen = TRACK.x1 - TRACK.x0;
-  box(tLen, 0.06, 0.95, M.frameLite, 0, 0.07, TRACK.z, track);
-  for (const dz of [-0.3, 0.3]) {
-    box(tLen, 0.07, 0.07, M.rail, 0, 0.135, TRACK.z + dz, track);
+  box(tLen, 0.06, 1.77, M.frameLite, 0, 0.07, TRACK.z, track);                        // base frame
+  for (const dz of [-0.6, 0.6]) {
+    box(tLen, 0.16, 0.12, M.frame, 0, 0.18, TRACK.z + dz, track);                       // rail beams
+    box(tLen, 0.04, 0.06, M.rail, 0, 0.28, TRACK.z + dz, track);                        // rail heads
   }
-  box(tLen, 0.03, 0.06, M.black, 0, 0.115, TRACK.z, track);   // rack
-  for (const x of [TRACK.x0 + 0.1, TRACK.x1 - 0.1]) box(0.16, 0.3, 0.95, M.yellow, x, 0.19, TRACK.z, track);
-  for (let x = TRACK.x0 + 0.5; x < TRACK.x1; x += 1.2) for (const dz of [-0.42, 0.42]) cyl(0.025, 0.02, M.rail, x, 0.11, TRACK.z + dz, track, 8);
-  // cable chain trough behind the track
-  box(tLen * 0.55, 0.14, 0.3, M.frameLite, -tLen * 0.2, 0.07, TRACK.z - 0.85, track);
-  // light curtain posts at the cell corners
+  box(tLen, 0.17, 1.0, M.black, 0, 0.175, TRACK.z, track);                              // centre cover
+  for (const x of [TRACK.x0 + 0.1, TRACK.x1 - 0.1]) box(0.18, 0.4, 1.77, M.yellow, x, 0.2, TRACK.z, track);   // end stops
+  for (let x = TRACK.x0 + 0.5; x < TRACK.x1; x += 1.2) for (const dz of [-0.82, 0.82]) cyl(0.028, 0.02, M.rail, x, 0.11, TRACK.z + dz, track, 8);
+  box(tLen * 0.55, 0.16, 0.32, M.frameLite, -tLen * 0.2, 0.08, TRACK.z - 1.15, track);    // drag chain channel
+  for (let x = TRACK.x0 + 0.3; x < TRACK.x0 + 0.3 + tLen * 0.5; x += 0.09) box(0.07, 0.07, 0.2, M.black, x, 0.2, TRACK.z - 1.15, track, false);   // drag chain links
+  // cell boundary posts (light curtains)
   for (const [x, z] of [[CB.x0, CB.z0], [CB.x0, CB.z1], [CB.x1, CB.z0], [CB.x1, CB.z1]]) {
     box(0.09, 1.9, 0.09, M.yellow, x, 0.95, z);
     box(0.06, 1.6, 0.04, M.black, x, 1.05, z + (z < 0 ? 0.06 : -0.06));
   }
 
-  // ------------------------------------------------------------------ C-frame with the robot
-  const cframe = new THREE.Group(); scene.add(cframe);
-  cframe.position.set(PARK_X, 0, 0);
-  const cz = TRACK.z;
-  box(1.1, 0.36, 1.0, M.frame, 0, 0.36, cz, cframe);                  // carriage
-  box(1.12, 0.06, 1.02, M.orange, 0, 0.56, cz, cframe);
-  for (const dx of [-0.42, 0.42]) for (const dz of [-0.3, 0.3]) cyl(0.07, 0.08, M.black, dx, 0.2, cz + dz, cframe, 12).rotation.x = Math.PI / 2;
-  box(0.46, MOUNT.y + 0.35 - 0.56, 0.46, M.frame, 0, (MOUNT.y + 0.35 + 0.56) / 2, cz - 0.1, cframe);   // column
-  const boomLen = (MOUNT.z + 0.2) - (cz - 0.35);
-  box(0.42, 0.38, boomLen, M.frame, 0, MOUNT.y + 0.19, (cz - 0.35) + boomLen / 2, cframe);              // boom
-  box(0.44, 0.07, boomLen + 0.02, M.orange, 0, MOUNT.y + 0.41, (cz - 0.35) + boomLen / 2, cframe);
-  box(0.5, 0.03, 0.5, M.frameLite, 0, MOUNT.y - 0.015, MOUNT.z, cframe);                                  // mount plate
-  // CLOOS on both sides of the boom
-  const logoTex = textTex('CLOOS', 512, 128, '#ffffff', null, '700 92px Teko, "Arial Narrow", sans-serif');
-  for (const s of [-1, 1]) {
-    const p = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.25), new THREE.MeshBasicMaterial({ map: logoTex, transparent: true }));
-    p.position.set(s * 0.215, MOUNT.y + 0.19, cz + 0.45); p.rotation.y = s * Math.PI / 2; cframe.add(p);
-  }
-  // power source and wire drum ride on the carriage back
-  box(0.5, 0.8, 0.62, M.frameLite, 0.15, 0.94, cz - 0.62, cframe);
-  box(0.52, 0.1, 0.64, M.orange, 0.15, 1.38, cz - 0.62, cframe);
-  cyl(0.24, 0.75, M.orange, -0.36, 0.92, cz - 0.62, cframe);
-  // cable from the drum up the column to the robot
-  strut(V(-0.15, 1.3, cz - 0.4), V(-0.15, MOUNT.y + 0.1, cz - 0.3), 0.06, M.black, cframe);
-  strut(V(-0.15, MOUNT.y + 0.1, cz - 0.3), V(-0.15, MOUNT.y + 0.1, MOUNT.z - 0.2), 0.06, M.black, cframe);
-
-  // the robot: QRC410 meshes from the STEP, hung upside down from the boom
+  // ------------------------------------------------------------------ C-frame (real RP-C geometry) with the robot
   function b64(s, Type) {
     const bin = atob(s), u8 = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
@@ -412,6 +449,49 @@
     g.computeBoundingSphere();
     return g;
   }
+  const cframe = new THREE.Group(); scene.add(cframe);
+  cframe.position.set(PARK_X, 0, 0);
+  const cz = TRACK.z;
+  // carriage on the track
+  box(1.9, 0.14, 1.6, M.frame, 0, CARRIAGE_TOP - 0.07, cz, cframe);
+  box(1.92, 0.04, 1.62, M.orange, 0, CARRIAGE_TOP - 0.16, cz, cframe, false);
+  // the C-frame itself (CLOOS RP-C, from its STEP), black like the real ones
+  if (CF) {
+    const m = new THREE.Mesh(geomFrom(CF), cfMat);
+    m.position.set(0, MOUNT.y, MOUNT.z); m.castShadow = true; m.receiveShadow = true;
+    cframe.add(m);
+  } else {
+    box(0.6, MOUNT.y - CARRIAGE_TOP, 0.75, cfMat, 0, (MOUNT.y + CARRIAGE_TOP) / 2, cz, cframe);
+    box(0.45, 0.36, MOUNT.z - cz + 0.3, cfMat, 0, MOUNT.y + 0.18, (MOUNT.z + cz) / 2, cframe);
+  }
+  const logoTex = textTex('CLOOS', 512, 128, '#ffffff', null, '700 92px Teko, "Arial Narrow", sans-serif');
+  for (const s of [-1, 1]) {
+    const p = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.22), new THREE.MeshBasicMaterial({ map: logoTex, transparent: true }));
+    p.position.set(s * 0.262, MOUNT.y + 0.17, MOUNT.z - 1.15); p.rotation.y = s * Math.PI / 2; cframe.add(p);
+  }
+  // power source and wire drum ride on the carriage, behind the column
+  box(0.5, 0.8, 0.6, M.frameLite, 0.62, CARRIAGE_TOP + 0.4, cz - 0.3, cframe);
+  box(0.52, 0.08, 0.62, M.orange, 0.62, CARRIAGE_TOP + 0.82, cz - 0.3, cframe);
+  cyl(0.24, 0.72, M.orange, -0.62, CARRIAGE_TOP + 0.36, cz - 0.35, cframe);
+  strut(V(-0.36, CARRIAGE_TOP + 0.6, cz - 0.2), V(-0.36, MOUNT.y + 0.05, cz + 0.2), 0.05, M.black, cframe);
+  strut(V(-0.36, MOUNT.y + 0.05, cz + 0.2), V(-0.2, MOUNT.y + 0.05, MOUNT.z - 0.25), 0.05, M.black, cframe);
+
+  // the RoboScan laser scanner: on the C-frame (not on the robot), on a bracket off the boom tip,
+  // looking down at the beam, long side across the beam
+  const scanner = new THREE.Group(); cframe.add(scanner);
+  scanner.position.set(SCAN_OFF, MOUNT.y - 0.05, MOUNT.z + 0.32);
+  scanner.rotation.x = -0.42;                         // tilted toward the beam
+  const bracket = mat(0x6d757b, { metalness: 0.5, roughness: 0.45 });
+  box(0.7, 0.1, 0.16, bracket, SCAN_OFF / 2 - 0.2, MOUNT.y + 0.05, MOUNT.z + 0.08, cframe);           // arm off the boom tip
+  box(0.16, 0.1, 0.42, bracket, SCAN_OFF, MOUNT.y + 0.05, MOUNT.z + 0.22, cframe);                       // reaches toward the beam
+  box(0.18, 0.02, 0.36, bracket, SCAN_OFF, MOUNT.y - 0.005, MOUNT.z + 0.32, cframe, false);               // mounting plate
+  const scanBlue = mat(0x2a63b8, { roughness: 0.45, metalness: 0.2 });
+  box(0.16, 0.16, 0.32, scanBlue, 0, -0.1, 0, scanner);                                                   // about 1 ft x 0.5 ft
+  box(0.165, 0.025, 0.325, M.black, 0, -0.19, 0, scanner, false);
+  box(0.07, 0.012, 0.22, mat(0x101418, { metalness: 0.8, roughness: 0.1 }), 0, -0.203, 0, scanner, false);   // window
+  const sensorEye = new THREE.Object3D(); sensorEye.position.set(0, -0.21, 0); scanner.add(sensorEye);
+
+  // the robot: QRC410 meshes from the STEP, hung upside down from the boom
   const robotRoot = new THREE.Group();
   robotRoot.position.set(0, MOUNT.y, MOUNT.z);
   robotRoot.rotation.z = Math.PI;          // hanging: local +y points down, +z still points at the beam
@@ -430,17 +510,11 @@
     parent.add(node); parent = node; prev = g.pivot;
     if (g.axis) joints.push({ node, axis: g.axis });
   }
-  // RoboScan laser sensor on the last axis, beside the torch neck
-  const a6 = joints[5].node;
-  const sensor = new THREE.Group(); a6.add(sensor);
-  sensor.position.set(0, 0.11, 0.06);
-  box(0.09, 0.08, 0.16, M.frame, 0, 0, 0, sensor);
-  box(0.092, 0.02, 0.162, M.orange, 0, 0.03, 0, sensor);
-  const sensorEye = new THREE.Object3D(); sensorEye.position.set(0, -0.045, 0.06); sensor.add(sensorEye);
 
   // ------------------------------------------------------------------ kinematics (robot base frame)
   const PIV = R.groups.slice(1).map(g => g.pivot), AX = R.groups.slice(1).map(g => g.axis);
-  const LIM = [[-3, 3], [-1.5, 1.4], [-2.2, 1.5], [-3, 3], [-1.45, 2.1], [-3, 3]];
+  // A6 turns more than a full turn on a welding robot; the torch neck hangs under at A6 = 180 deg
+  const LIM = [[-3, 3], [-1.5, 1.4], [-2.2, 1.5], [-3, 3], [-1.45, 2.1], [-3.5, 3.5]];
   const mul3 = (A, B) => { const C = new Array(9); for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) C[r * 3 + c] = A[r * 3] * B[c] + A[r * 3 + 1] * B[3 + c] + A[r * 3 + 2] * B[6 + c]; return C; };
   const mv3 = (A, v) => [A[0] * v[0] + A[1] * v[1] + A[2] * v[2], A[3] * v[0] + A[4] * v[1] + A[5] * v[2], A[6] * v[0] + A[7] * v[1] + A[8] * v[2]];
   const rot3 = (a, q) => { const c = Math.cos(q), s = Math.sin(q); return a === 'x' ? [1, 0, 0, 0, c, -s, 0, s, c] : a === 'y' ? [c, 0, s, 0, 1, 0, -s, 0, c] : [c, -s, 0, s, c, 0, 0, 0, 1]; };
@@ -451,8 +525,8 @@
     for (let i = 0; i < 6; i++) { if (i > 0) p = add3(p, mv3(Rm, sub3(PIV[i], PIV[i - 1]))); Rm = mul3(Rm, rot3(AX[i], q[i])); }
     return { p: add3(p, mv3(Rm, R.tcp)), d: mv3(Rm, R.wire) };
   }
-  function solve6(A, b) {
-    const n = 6, Mx = A.map((r, i) => [...r, b[i]]);
+  function solveN(A, b) {
+    const n = b.length, Mx = A.map((r, i) => [...r, b[i]]);
     for (let c = 0; c < n; c++) {
       let p = c; for (let r = c + 1; r < n; r++) if (Math.abs(Mx[r][c]) > Math.abs(Mx[p][c])) p = r;
       [Mx[c], Mx[p]] = [Mx[p], Mx[c]];
@@ -463,67 +537,73 @@
     for (let r = n - 1; r >= 0; r--) { let s = Mx[r][n]; for (let c = r + 1; c < n; c++) s -= Mx[r][c] * x[c]; x[r] = s / (Mx[r][r] || 1e-12); }
     return x;
   }
-  // damped least squares on TCP position and wire direction (difference residual: no flip trap)
+  // Damped least squares on TCP position and wire direction, with a soft pull toward a relaxed
+  // posture: the torch's free roll is spent keeping A4 and A6 near neutral, so the wrist never
+  // corkscrews. A final pass with a lighter pull tightens the TCP onto the joint.
+  const RELAX = [0, -0.3, 0.6, 0, -0.9, Math.PI];
+  const WQ = [0.02, 0.01, 0.01, 0.12, 0.02, 0.12];
   function ik(pT, dT, q0) {
     const q = q0.slice(), W = 0.25;
-    const res = f => [...sub3(pT, f.p), ...scl3(sub3(dT, f.d), W)];
-    for (let it = 0; it < 80; it++) {
-      const f = fk(q), e = res(f);
-      if (nrm3(sub3(pT, f.p)) < 2e-4 && nrm3(sub3(dT, f.d)) < 1e-3) break;
-      const J = [];
-      for (let j = 0; j < 6; j++) { const qq = q.slice(); qq[j] += 1e-5; const g = res(fk(qq)); J.push(g.map((v, k) => -(v - e[k]) / 1e-5)); }
-      const lam = it < 6 ? 0.03 : 0.004, A = [], b = [];
-      for (let r = 0; r < 6; r++) {
-        A.push(new Array(6));
-        for (let c = 0; c < 6; c++) { let s = 0; for (let k = 0; k < 6; k++) s += J[r][k] * J[c][k]; A[r][c] = s + (r === c ? lam * lam : 0); }
-        let s = 0; for (let k = 0; k < 6; k++) s += J[r][k] * e[k]; b.push(s);
+    for (const [iters, kq] of [[90, 1], [40, 0.15]]) {
+      const res = qq => { const f = fk(qq); return [...sub3(pT, f.p), ...scl3(sub3(dT, f.d), W), ...qq.map((v, j) => WQ[j] * kq * (RELAX[j] - v))]; };
+      for (let it = 0; it < iters; it++) {
+        const e = res(q), J = [];
+        for (let j = 0; j < 6; j++) { const qq = q.slice(); qq[j] += 1e-5; const g = res(qq); J.push(g.map((v, k) => -(v - e[k]) / 1e-5)); }
+        const A = [], b = [];
+        for (let r = 0; r < 6; r++) {
+          A.push(new Array(6));
+          for (let c = 0; c < 6; c++) { let s = 0; for (let k = 0; k < e.length; k++) s += J[r][k] * J[c][k]; A[r][c] = s + (r === c ? 1.6e-5 : 0); }
+          let s = 0; for (let k = 0; k < e.length; k++) s += J[r][k] * e[k]; b.push(s);
+        }
+        const dq = solveN(A, b), mx = Math.max(...dq.map(Math.abs)), st = mx > 0.3 ? 0.3 / mx : 1;
+        for (let j = 0; j < 6; j++) q[j] = clamp(q[j] + dq[j] * st, LIM[j][0], LIM[j][1]);
+        if (mx < 1e-6) break;
       }
-      const dq = solve6(A, b), mx = Math.max(...dq.map(Math.abs)), st = mx > 0.35 ? 0.35 / mx : 1;
-      for (let j = 0; j < 6; j++) q[j] = clamp(q[j] + dq[j] * st, LIM[j][0], LIM[j][1]);
     }
     return q;
   }
-  // world point / direction relative to the carriage -> robot base frame (base is rotated 180 deg about z)
   const toBase = p => [-p[0], MOUNT.y - p[1], p[2] - MOUNT.z];
   const dirBase = d => [-d[0], -d[1], d[2]];
   const unit = a => scl3(a, 1 / nrm3(a));
   const ikW = (p, d, seed) => ik(toBase(p), dirBase(unit(d)), seed);
-
-  // Poses, all relative to the carriage (carriage x = 0). The weld program is the same at every
-  // stiffener because the carriage parks square to each one.
-  const Q0 = [0, 0.6, 0.6, 0, 0.9, 0];
-  const PARK = ikW([0, 2.05, -1.05], [0, -1, 0.15], [0, -0.3, 0.3, 0, 1.2, 0]);
-  const SCAN = ikW([0, BEAM.top + 0.42, -0.42], [0, -0.75, 0.62], PARK);
-  const SAFE = ikW([0, BEAM.top + 0.3, -0.36], [0, -0.8, 0.55], SCAN);
-  const by = BEAM.y0;
+  const D2R = Math.PI / 180;
+  // Home: arm swung along the track toward the park end, upper arm leaning back 20 deg, elbow
+  // open, wrist straight, torch neck under and pointing about 45 deg down. Every axis mid-range.
+  const HOME = [-90 * D2R, -20 * D2R, 10 * D2R, 0, 10 * D2R, 180 * D2R];
+  // Weld program, relative to the carriage parked WELD_DX to the open side of the joint. The same
+  // program serves every stiffener because the carriage stops square to each one.
+  const webY = BEAM.cy + hw + 0.003;
   const PROG = [-1, 1].map(side => {
-    const sx = side * (STIFF_T / 2 + 0.002), sz = -BEAM.tw / 2 - 0.002;
-    const a = [sx, by + BEAM.tf + 0.04, sz], b = [sx, by + BEAM.d - BEAM.tf - 0.05, sz];
-    const dir = unit([-side * 0.55, -0.3, 0.78]);
+    const sx = side * (STIFF_T / 2 + 0.003) - side * WELD_DX;
+    const a = [sx, webY, zA], b = [sx, webY, zB];
+    const dir = unit([-side * 0.4, -0.8, 0.2]);
     const back = (p, k) => add3(p, scl3(dir, -k));
-    const pre = ikW(back(a, 0.16), dir, Q0);
+    const safe = ikW(add3(back(a, 0.18), [0, 0.28, 0]), dir, RELAX);
+    const pre = ikW(back(a, 0.12), dir, safe);
     const path = [];
     let seed = pre;
     for (let i = 0; i <= 24; i++) { seed = ikW(add3(a, scl3(sub3(b, a), i / 24)), dir, seed); path.push(seed); }
-    const post = ikW(add3(back(b, 0.16), [0, 0.02, 0]), dir, seed);
-    return { side, pre, path, post };
+    const post = ikW(add3(back(b, 0.12), [0, 0.04, 0]), dir, seed);
+    const safeB = ikW(add3(back(b, 0.18), [0, 0.28, 0]), dir, post);
+    return { side, safe, pre, path, post, safeB };
   });
   const along = (path, u) => { const f = clamp(u, 0, 1) * (path.length - 1), i = Math.min(path.length - 2, Math.floor(f)); return lerpQ(path[i], path[i + 1], f - i); };
 
   // ------------------------------------------------------------------ scan: laser fan and point cloud
-  // Beam cross-section the laser sees from above the near side, in beam frame (y, z) at a given x.
+  // What the laser sees from above at one x: flange tops, the inside of the flanges, the web and,
+  // at a stiffener, its top edge. Beam frame (y, z).
   function profile(x) {
-    const pts = [], T = BEAM.tf, D = BEAM.d, hb = BEAM.bf / 2, hw = BEAM.tw / 2;
-    for (let i = 0; i <= 10; i++) pts.push([D, lerp(hb, -hb, i / 10)]);                // top flange top
-    pts.push([D - T, -hb]);                                                             // near flange tip
-    const nearStiff = STIFF_X.some(sx => Math.abs(x - sx) < STIFF_T / 2);
-    if (nearStiff) { for (let i = 0; i <= 6; i++) pts.push([lerp(D - T, T, i / 6), -hb]); }  // stiffener edge
-    else {
-      for (let i = 0; i <= 4; i++) pts.push([D - T, lerp(-hb, -hw, i / 4)]);           // flange underside
-      for (let i = 0; i <= 10; i++) pts.push([lerp(D - T, T, i / 10), -hw]);            // web face
-      for (let i = 0; i <= 4; i++) pts.push([T, lerp(-hw, -hb, i / 4)]);               // bottom flange top
+    const pts = [];
+    const atStiff = STIFF_X.some(sx => Math.abs(x - sx) < STIFF_T / 2 + 0.002);
+    for (let i = 0; i <= 3; i++) pts.push([hb, lerp(-hd, -hd + T, i / 3)]);              // near flange top
+    if (atStiff) {
+      for (let i = 0; i <= 12; i++) pts.push([hw + stiffH, lerp(-hd + T, hd - T, i / 12)]);   // stiffener top edge
+    } else {
+      for (let i = 0; i <= 3; i++) pts.push([lerp(hb, hw, i / 3), -hd + T]);               // near flange inside
+      for (let i = 0; i <= 14; i++) pts.push([hw, lerp(-hd + T, hd - T, i / 14)]);         // web
+      for (let i = 0; i <= 3; i++) pts.push([lerp(hw, hb, i / 3), hd - T]);                // far flange inside
     }
-    pts.push([0, -hb]);
+    for (let i = 0; i <= 3; i++) pts.push([hb, lerp(hd - T, hd, i / 3)]);                // far flange top
     return pts;
   }
   const SLICES = 360;
@@ -547,7 +627,7 @@
   const cloud = new THREE.Points(cloudGeo, cloudMat);
   beam.add(cloud);
 
-  const laserMat = new THREE.MeshBasicMaterial({ color: 0xff2a1a, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
+  const laserMat = new THREE.MeshBasicMaterial({ color: 0xff2a1a, transparent: true, opacity: 0.32, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
   const laserGeo = new THREE.BufferGeometry();
   laserGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(60 * 9), 3));
   const laserFan = new THREE.Mesh(laserGeo, laserMat); laserFan.frustumCulled = false; scene.add(laserFan);
@@ -555,6 +635,10 @@
   lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(60 * 3), 3));
   const laserLine = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xff3020 }));
   laserLine.frustumCulled = false; scene.add(laserLine);
+  const dotGeo = new THREE.BufferGeometry();
+  dotGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(400 * 3), 3));
+  const laserDots = new THREE.Points(dotGeo, new THREE.PointsMaterial({ color: 0xff2d1e, size: 0.022, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  laserDots.frustumCulled = false; scene.add(laserDots);
 
   // ------------------------------------------------------------------ arc: glow, light, sparks
   const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xd6e6ff, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
@@ -568,7 +652,7 @@
   const spSeed = Array.from({ length: NSP }, () => [Math.random(), Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random()]);
 
   // ------------------------------------------------------------------ operator station and operator
-  const station = new THREE.Group(); station.position.set(-8.4, 0, -3.2); station.rotation.y = Math.PI * 0.18; scene.add(station);
+  const station = new THREE.Group(); station.position.set(-8.9, 0, -3.3); station.rotation.y = Math.PI * 0.22; scene.add(station);
   box(0.5, 1.05, 0.4, M.frameLite, 0, 0.55, 0, station);
   box(0.62, 0.42, 0.06, M.black, 0, 1.4, 0.06, station).rotation.x = -0.25;
   const screenCanvas = document.createElement('canvas'); screenCanvas.width = 512; screenCanvas.height = 320;
@@ -589,7 +673,7 @@
     lines.forEach((l, i) => { g.fillStyle = i === 0 ? '#ffffff' : '#c6ccd0'; g.fillText(l, 24, 100 + i * 52); });
     screenTex.needsUpdate = true;
   }
-  const person = new THREE.Group(); person.position.set(-7.9, 0, -3.95); person.rotation.y = Math.PI * 0.85; scene.add(person);
+  const person = new THREE.Group(); person.position.set(-8.4, 0, -4.05); person.rotation.y = Math.PI * 0.85; scene.add(person);
   for (const s of [-1, 1]) box(0.13, 0.82, 0.16, M.denim, s * 0.1, 0.41, 0, person);
   box(0.42, 0.6, 0.24, M.hivis, 0, 1.12, 0, person);
   for (const s of [-1, 1]) box(0.1, 0.56, 0.12, M.hivis, s * 0.27, 1.1, 0.02, person);
@@ -598,40 +682,40 @@
   helmet.position.set(0, 1.63, 0); helmet.castShadow = true; person.add(helmet);
 
   // ------------------------------------------------------------------ steps and timeline
+  // 0 cell, 1 set the beam, 2 scan, 3 check, 4 weld, 5 option: positioners, 6 your parts
   const NEAR_N = SEAMS.length;
   const WELD_CYCLE = 9.0;
   const WELD_END = STIFF_X.length * WELD_CYCLE;
-  const DUR = [10, 8, 12.5, 7, WELD_END + 2.5, 12];
-  const SPED_UP = [false, false, true, false, true, false];
+  const DUR = [10, 8, 12.5, 7, WELD_END + 2.0, 10, 12];
+  const SPED_UP = [false, false, true, false, true, false, false];
+  const stopX = (k, side) => STIFF_X[k] + side * WELD_DX;     // carriage stop for one joint
 
-  // weld timeline inside one stiffener cycle (seconds)
-  const WP = { travel: 1.2, toPreA: 1.9, inA: 2.3, weldA: 4.3, outA: 4.7, safeA: 5.3, toPreB: 5.9, inB: 6.3, weldB: 8.3, outB: 8.7 };
+  // one stiffener cycle (seconds): joint on the -x side, then the +x side
+  const WP = { travel: 1.0, toPre: 1.6, in: 1.9, weld: 3.8, out: 4.1, up: 4.5, move: 5.4, toPre2: 5.9, in2: 6.2, weld2: 8.1, out2: 8.4 };
   function weldState(t) {
-    // returns carriage x, joint values, arc point index (or -1), seams completed fraction per seam
     const done = new Array(NEAR_N).fill(0);
+    const A = PROG[0], B = PROG[1];
     if (t >= WELD_END) {
-      for (let i = 0; i < NEAR_N; i++) done[i] = 1;
-      return { x: STIFF_X[STIFF_X.length - 1], q: lerpQ(SAFE, PARK, ease(seg(t, WELD_END, WELD_END + 1.5))), arc: null, done, active: -1 };
+      done.fill(1);
+      return { x: stopX(STIFF_X.length - 1, 1), q: lerpQ(B.safeB, HOME, ease(seg(t, WELD_END, WELD_END + 1.6))), arc: null, done, active: -1 };
     }
     const k = Math.floor(t / WELD_CYCLE), u = t - k * WELD_CYCLE;
     for (let i = 0; i < k * 2; i++) done[i] = 1;
-    const prevX = k === 0 ? STIFF_X[0] : STIFF_X[k - 1];
-    const x = lerp(prevX, STIFF_X[k], ease(seg(u, 0, WP.travel)));
-    const A = PROG[0], B = PROG[1];
-    let q, arc = null, active = -1;
-    if (u < WP.travel) q = k === 0 ? lerpQ(PARK, SAFE, ease(seg(u, 0, WP.travel))) : SAFE;
-    else if (u < WP.toPreA) q = lerpQ(SAFE, A.pre, ease(seg(u, WP.travel, WP.toPreA)));
-    else if (u < WP.inA) q = lerpQ(A.pre, A.path[0], ease(seg(u, WP.toPreA, WP.inA)));
-    else if (u < WP.weldA) { const f = seg(u, WP.inA, WP.weldA); q = along(A.path, f); arc = { seam: k * 2, f }; done[k * 2] = f; }
-    else if (u < WP.outA) { q = lerpQ(A.path[A.path.length - 1], A.post, ease(seg(u, WP.weldA, WP.outA))); done[k * 2] = 1; }
-    else if (u < WP.safeA) { q = lerpQ(A.post, SAFE, ease(seg(u, WP.outA, WP.safeA))); done[k * 2] = 1; }
-    else if (u < WP.toPreB) { q = lerpQ(SAFE, B.pre, ease(seg(u, WP.safeA, WP.toPreB))); done[k * 2] = 1; }
-    else if (u < WP.inB) { q = lerpQ(B.pre, B.path[0], ease(seg(u, WP.toPreB, WP.inB))); done[k * 2] = 1; }
-    else if (u < WP.weldB) { const f = seg(u, WP.inB, WP.weldB); q = along(B.path, f); arc = { seam: k * 2 + 1, f }; done[k * 2] = 1; done[k * 2 + 1] = f; }
-    else if (u < WP.outB) { q = lerpQ(B.path[B.path.length - 1], B.post, ease(seg(u, WP.weldB, WP.outB))); done[k * 2] = done[k * 2 + 1] = 1; }
-    else { q = lerpQ(B.post, SAFE, ease(seg(u, WP.outB, WELD_CYCLE))); done[k * 2] = done[k * 2 + 1] = 1; }
-    if (arc) active = arc.seam;
-    return { x, q, arc, done, active };
+    const fromX = k === 0 ? stopX(0, -1) : stopX(k - 1, 1);
+    let x, q, arc = null;
+    if (u < WP.travel) { x = lerp(fromX, stopX(k, -1), ease(seg(u, 0, WP.travel))); q = k === 0 ? lerpQ(HOME, A.safe, ease(seg(u, 0, WP.travel))) : lerpQ(B.safeB, A.safe, ease(seg(u, 0, WP.travel))); }
+    else if (u < WP.toPre) { x = stopX(k, -1); q = lerpQ(A.safe, A.pre, ease(seg(u, WP.travel, WP.toPre))); }
+    else if (u < WP.in) { x = stopX(k, -1); q = lerpQ(A.pre, A.path[0], ease(seg(u, WP.toPre, WP.in))); }
+    else if (u < WP.weld) { x = stopX(k, -1); const f = seg(u, WP.in, WP.weld); q = along(A.path, f); arc = { seam: k * 2, f }; done[k * 2] = f; }
+    else if (u < WP.out) { x = stopX(k, -1); q = lerpQ(A.path[A.path.length - 1], A.post, ease(seg(u, WP.weld, WP.out))); done[k * 2] = 1; }
+    else if (u < WP.up) { x = stopX(k, -1); q = lerpQ(A.post, A.safeB, ease(seg(u, WP.out, WP.up))); done[k * 2] = 1; }
+    else if (u < WP.move) { x = lerp(stopX(k, -1), stopX(k, 1), ease(seg(u, WP.up, WP.move))); q = lerpQ(A.safeB, B.safe, ease(seg(u, WP.up, WP.move))); done[k * 2] = 1; }
+    else if (u < WP.toPre2) { x = stopX(k, 1); q = lerpQ(B.safe, B.pre, ease(seg(u, WP.move, WP.toPre2))); done[k * 2] = 1; }
+    else if (u < WP.in2) { x = stopX(k, 1); q = lerpQ(B.pre, B.path[0], ease(seg(u, WP.toPre2, WP.in2))); done[k * 2] = 1; }
+    else if (u < WP.weld2) { x = stopX(k, 1); const f = seg(u, WP.in2, WP.weld2); q = along(B.path, f); arc = { seam: k * 2 + 1, f }; done[k * 2] = 1; done[k * 2 + 1] = f; }
+    else if (u < WP.out2) { x = stopX(k, 1); q = lerpQ(B.path[B.path.length - 1], B.post, ease(seg(u, WP.weld2, WP.out2))); done[k * 2] = done[k * 2 + 1] = 1; }
+    else { x = stopX(k, 1); q = lerpQ(B.post, B.safeB, ease(seg(u, WP.out2, WELD_CYCLE))); done[k * 2] = done[k * 2 + 1] = 1; }
+    return { x, q, arc, done, active: arc ? arc.seam : -1 };
   }
 
   function setRobot(q) { for (let j = 0; j < 6; j++) joints[j].node.rotation[joints[j].axis] = q[j]; }
@@ -639,89 +723,103 @@
   const tmp = new THREE.Vector3();
   let arcOn = false, laserOn = false;
   function setState(step, t, wall) {
-    // defaults
-    let x = PARK_X, q = PARK, beamY = BEAM.y0, cloudN = 0, cloudOp = 0.9;
-    let doneArr = new Array(NEAR_N).fill(0), hi = 0, far = false, arc = null, scanX = null;
+    let x = PARK_X, q = HOME, beamY = BEAM.cy, flip = 0, cloudN = 0, cloudOp = 0.9;
+    let doneArr = new Array(NEAR_N).fill(0), hi = 0, far = false, farLit = 0, arc = null, scanX = null;
+    let showPos = false, showStands = true, farDone = false;
     let screenLines = ['Ready', 'Load the part, then start the scan'];
     let crane = { hookY: railY - 1.2, rigged: false };
 
     if (step === 1) {
-      const u = seg(t, 0, 5.2);
-      beamY = lerp(BEAM.y0 + 2.3, BEAM.y0, ease(u));
+      beamY = lerp(BEAM.cy + 2.3, BEAM.cy, ease(seg(t, 0, 5.2)));
       const lift = ease(seg(t, 5.6, 7.6));
-      crane = { hookY: lerp(beamY + BEAM.d + 1.25, railY - 1.2, lift), rigged: t < 5.6, beamY };
+      crane = { hookY: lerp(beamY + hb + 1.25, railY - 1.2, lift), rigged: t < 5.6, beamY };
       screenLines = t < 5.4 ? ['Ready', 'Crane is setting the part'] : ['Ready', 'Part on the stands'];
     } else if (step >= 2) {
       cloudN = sliceStart[SLICES];
     }
     if (step === 2) {
       x = lerp(PARK_X, SCAN_X0, ease(seg(t, 0, 1.5)));
-      q = lerpQ(PARK, SCAN, ease(seg(t, 0, 1.5)));
       const u = seg(t, 1.5, 11.5);
-      if (t > 1.5 && t < 11.6) { x = lerp(SCAN_X0, SCAN_X1, u); scanX = x; }
-      if (t >= 11.5) x = SCAN_X1;
-      const beamX = clamp(x, -BEAM.L / 2, BEAM.L / 2);
-      const sl = clamp(Math.round(((BEAM.L / 2 - beamX) / BEAM.L) * (SLICES - 1)), 0, SLICES - 1);
-      cloudN = t <= 1.5 ? 0 : (x > BEAM.L / 2 ? 0 : sliceStart[sl + 1]);
-      screenLines = t < 1.5 ? ['Starting scan', 'Moving to the part'] : (t < 11.5 ? ['Scanning', Math.round(u * 100) + ' percent of the part'] : ['Scan done', 'Finding the joints']);
+      if (t > 1.5) x = lerp(SCAN_X0, SCAN_X1, u);
+      const sx = x + SCAN_OFF;
+      if (t > 1.5 && t < 11.6) scanX = sx;
+      const bx = clamp(sx, -BEAM.L / 2, BEAM.L / 2);
+      const sl = clamp(Math.round(((BEAM.L / 2 - bx) / BEAM.L) * (SLICES - 1)), 0, SLICES - 1);
+      cloudN = t <= 1.5 || sx > BEAM.L / 2 ? 0 : sliceStart[sl + 1];
+      screenLines = t < 1.5 ? ['Starting scan', 'C-frame to the start'] : (t < 11.5 ? ['Scanning', Math.round(u * 100) + ' percent of the part'] : ['Scan done', 'Finding the joints']);
     }
     if (step === 3) {
-      x = lerp(SCAN_X1, STIFF_X[0], ease(seg(t, 0, 3.0)));
-      q = lerpQ(SCAN, PARK, ease(seg(t, 0, 1.2)));
-      cloudOp = lerp(0.9, 0.18, ease(seg(t, 0, 2)));
+      x = lerp(SCAN_X1, stopX(0, -1), ease(seg(t, 0, 3.0)));
+      cloudOp = lerp(0.9, 0.16, ease(seg(t, 0, 2)));
       hi = clamp((t - 1.2) / 2.2, 0, 1);
       far = t > 3.8;
-      screenLines = t < 1.2 ? ['Finding joints'] : ['8 joints found', 'Far side: not in view', 'Operator checks, then starts'];
+      screenLines = t < 1.2 ? ['Finding joints'] : [NEAR_N + ' joints found', 'Underside: not in view', 'Operator checks, then starts'];
     }
     if (step === 4) {
       const w = weldState(t);
-      x = w.x; q = w.q; doneArr = w.done; arc = w.arc;
-      cloudN = 0;
+      x = w.x; q = w.q; doneArr = w.done; arc = w.arc; cloudN = 0;
       const n = w.done.filter(d => d >= 1).length;
       screenLines = t < WELD_END ? ['Welding', 'Joint ' + Math.min(NEAR_N, (w.active >= 0 ? w.active + 1 : n + 1)) + ' of ' + NEAR_N] : ['Done', NEAR_N + ' of ' + NEAR_N + ' joints welded'];
     }
     if (step === 5) {
-      x = lerp(STIFF_X[STIFF_X.length - 1], PARK_X, ease(seg(t, 0, 3.5)));
-      doneArr = new Array(NEAR_N).fill(1); cloudN = 0;
+      x = lerp(stopX(STIFF_X.length - 1, 1), PARK_X, ease(seg(t, 0, 2.5)));
+      doneArr.fill(1); cloudN = 0;
+      showPos = true; showStands = false;
+      flip = Math.PI * ease(seg(t, 2.0, 6.5));
+      farLit = t > 6.6 ? 1 : 0;
+      screenLines = t < 2 ? ['Positioner option', 'Beam held in two rings'] : (t < 6.6 ? ['Turning the beam', Math.round(seg(t, 2.0, 6.5) * 180) + ' degrees'] : ['Turned', 'Other side faces the robot']);
+    }
+    if (step === 6) {
+      x = PARK_X; doneArr.fill(1); cloudN = 0;
       screenLines = ['Done', 'Ready for the next part'];
     }
 
     // apply
     cframe.position.x = x;
     setRobot(q);
-    beam.position.y = beamY;
-    // crane rigging
+    beamRoot.position.y = beamY;
+    beamRoot.rotation.x = flip;
+    rings.forEach(r => { r.rotation.x = flip; });
+    positioners.visible = showPos;
+    stands.visible = showStands;
+    beamRoot.updateMatrixWorld(true);
+    // crane rigging (slings hook under the flange tops)
     hookBlock.position.set(0, crane.hookY, 0);
     const ropeTop = railY - 0.7, ropeLen = Math.max(0.05, ropeTop - crane.hookY - 0.14);
     hookRope.scale.y = ropeLen; hookRope.position.set(0, crane.hookY + 0.14 + ropeLen / 2, 0);
     spreader.visible = crane.rigged;
     topSlings.forEach(s => s.mesh.visible = crane.rigged);
     if (crane.rigged) {
-      const sy = crane.beamY + BEAM.d + 0.75;
+      const sy = crane.beamY + hb + 0.75;
       spreader.position.set(0, sy, 0);
-      for (const s of slings) setStrut(s.mesh, V(s.x, 0, 0), V(s.x, crane.beamY + BEAM.d - sy, s.s * 0.11));
+      for (const s of slings) setStrut(s.mesh, V(s.x, 0, 0), V(s.x, crane.beamY + hb - sy, s.s * (hd - T / 2)));
       for (const s of topSlings) setStrut(s.mesh, V(0, crane.hookY - 0.14, 0), V(s.x * 2.2, sy + 0.08, 0));
     }
     // cloud
     cloud.visible = cloudN > 0;
     cloudGeo.setDrawRange(0, cloudN);
     cloudMat.opacity = cloudOp;
-    // highlights
+    // joint highlights
     highlights.forEach((m, i) => {
       const on = step === 3 && hi > i / NEAR_N;
       m.visible = on;
       if (on) m.material.opacity = 0.55 + 0.4 * (0.5 + 0.5 * Math.sin(wall * 5 + i));
     });
     farMarks.forEach(m => m.visible = step === 3 && far);
+    farHi.forEach((m, i) => {
+      m.visible = farLit > 0;
+      if (m.visible) m.material.opacity = 0.55 + 0.4 * (0.5 + 0.5 * Math.sin(wall * 5 + i));
+    });
     // beads
     beads.forEach((m, i) => {
       const f = doneArr[i];
       m.visible = f > 0;
       m.geometry.setDrawRange(0, Math.ceil(f * TUBE_SEG) * TUBE_RAD * 6);
     });
-    // laser
+    farBeads.forEach(m => m.visible = farDone);
+    // laser from the scanner on the C-frame
     laserOn = scanX !== null && scanX > -BEAM.L / 2 - 0.3 && scanX < BEAM.L / 2 + 0.3;
-    laserFan.visible = laserLine.visible = laserOn;
+    laserFan.visible = laserLine.visible = laserDots.visible = laserOn;
     if (laserOn) updateLaser(clamp(scanX, -BEAM.L / 2, BEAM.L / 2));
     // arc
     arcOn = !!arc;
@@ -729,9 +827,9 @@
     arcLight.intensity = arcOn ? 2.2 + Math.sin(wall * 53) * 0.7 + Math.sin(wall * 17) * 0.5 : 0;
     if (arcOn) {
       const s = SEAMS[arc.seam];
-      tmp.copy(s.a).lerp(s.b, arc.f); tmp.y += beam.position.y;
+      tmp.copy(s.a).lerp(s.b, arc.f); beamRoot.localToWorld(tmp);
       glow.position.copy(tmp); glow.scale.setScalar(0.22 + 0.06 * Math.sin(wall * 41));
-      arcLight.position.copy(tmp).add(V(0, 0.05, -0.12));
+      arcLight.position.copy(tmp).add(V(0, 0.12, -0.1));
       updateSparks(tmp, wall);
     }
     drawScreen(screenLines);
@@ -742,13 +840,12 @@
     mesh.position.copy(a).addScaledVector(dir, 0.5);
     mesh.quaternion.setFromUnitVectors(V(0, 1, 0), dir.normalize());
   }
-  // BoxGeometry(…, 1, …) scaled along y: rebuild sling meshes with unit height
   slings.concat(topSlings).forEach(s => { s.mesh.geometry.dispose(); s.mesh.geometry = new THREE.BoxGeometry(0.035, 1, 0.035); });
 
   function updateLaser(bx) {
     scene.updateMatrixWorld(true);
     const eye = sensorEye.getWorldPosition(new THREE.Vector3());
-    const pts = profile(bx).map(([y, z]) => V(bx, y + beam.position.y, z));
+    const pts = profile(bx).map(([y, z]) => beamRoot.localToWorld(V(bx, y, z)));
     const fan = laserGeo.attributes.position.array, line = lineGeo.attributes.position.array;
     let n = 0;
     for (let i = 0; i < pts.length - 1 && n < 60; i++, n++) {
@@ -757,6 +854,11 @@
     laserGeo.setDrawRange(0, n * 3);
     laserGeo.attributes.position.needsUpdate = true;
     pts.slice(0, 60).forEach((p, i) => line.set([p.x, p.y, p.z], i * 3));
+    const dots = dotGeo.attributes.position.array; let nd = 0;
+    for (let i = 0; i < pts.length - 1 && nd < 400; i++) for (let k = 0; k < 6 && nd < 400; k++, nd++) {
+      const u = k / 6; dots.set([lerp(pts[i].x, pts[i + 1].x, u), lerp(pts[i].y, pts[i + 1].y, u) + 0.002, lerp(pts[i].z, pts[i + 1].z, u)], nd * 3);
+    }
+    dotGeo.setDrawRange(0, nd); dotGeo.attributes.position.needsUpdate = true;
     lineGeo.setDrawRange(0, Math.min(60, pts.length));
     lineGeo.attributes.position.needsUpdate = true;
     laserGeo.computeBoundingSphere();
@@ -765,7 +867,7 @@
     const a = spGeo.attributes.position.array;
     for (let i = 0; i < NSP; i++) {
       const s = spSeed[i], life = (wall * (1.4 + s[3]) + s[0]) % 1;
-      const vx = s[1] * 0.9, vz = -0.4 - Math.abs(s[2]) * 0.8, vy = 0.6 + s[3] * 0.8;
+      const vx = s[1] * 0.9, vz = s[2] * 0.9, vy = 0.6 + s[3] * 0.8;
       a[i * 3] = at.x + vx * life * 0.5;
       a[i * 3 + 1] = at.y + vy * life * 0.45 - 2.2 * life * life * 0.45;
       a[i * 3 + 2] = at.z + vz * life * 0.45;
@@ -774,36 +876,40 @@
   }
 
   // ------------------------------------------------------------------ camera per step
-  const HERO = params0().get('cam') === 'hero';
-  function params0() { return new URLSearchParams(location.hash.slice(1)); }
+  const HERO = new URLSearchParams(location.hash.slice(1)).get('cam') === 'hero';
   function camPose(step, t) {
     const x = cframe.position.x;
-    if (HERO) return { pos: V(x + 3.0, 3.4, -4.4), tgt: V(x - 1.2, 1.15, -0.3) };
+    if (HERO) return { pos: V(x + 3.2, 3.3, -4.4), tgt: V(x - 1.0, 1.0, -0.6) };
     switch (step) {
-      case 0: { const a = 0.12 * Math.sin(t * 0.09) + 0.05; return { pos: V(Math.sin(a) * 11 - 1.2, 3.5, Math.cos(a) * 11), tgt: V(0.6, 1.35, -1.4) }; }
-      case 1: return { pos: V(2.2, 3.1, 4.1), tgt: V(-0.6, 1.7, -0.6) };
-      case 2: return { pos: V(x * 0.6 + 1.6, 3.0, 3.5), tgt: V(x, 1.35, -0.9) };
-      case 3: return { pos: V(0.4, 1.95, -2.15), tgt: V(-2.6, 1.0, -0.15) };
-      case 4: return { pos: V(x + 2.8, 2.1, -3.0), tgt: V(x - 0.1, 1.0, -0.05) };
-      default: { const a = 0.1 * Math.sin(t * 0.09) - 0.75; return { pos: V(Math.sin(a) * 12.5, 3.6, Math.cos(a) * 11.5), tgt: V(0.4, 1.3, -1.2) }; }
+      case 0: { const a = 0.12 * Math.sin(t * 0.09) + 0.12; return { pos: V(Math.sin(a) * 11 + 0.5, 5.4, Math.cos(a) * 11 - 0.5), tgt: V(1.6, 1.3, -2.2) }; }
+      case 1: return { pos: V(3.0, 3.4, 4.2), tgt: V(-0.6, 1.6, -0.6) };
+      case 2: return { pos: V(x * 0.6 + 2.4, 3.6, 3.6), tgt: V(x - 0.4, 1.4, -0.9) };
+      case 3: return { pos: V(-0.2, 3.5, -3.6), tgt: V(-2.8, 1.1, -0.5) };
+      case 4: return { pos: V(x + 3.0, 3.1, -3.7), tgt: V(x - 0.5, 1.25, -0.6) };
+      case 5: return { pos: V(7.4, 2.6, 3.4), tgt: V(2.6, 0.95, 0) };
+      default: { const a = 0.1 * Math.sin(t * 0.09) - 0.7; return { pos: V(Math.sin(a) * 12.5, 4.0, Math.cos(a) * 11.5), tgt: V(0.4, 1.3, -1.6) }; }
     }
   }
 
   // ------------------------------------------------------------------ labels
   const tagsEl = document.getElementById('tags');
+  const beamPt = (x, y, z) => () => beamRoot.localToWorld(V(x, y, z));
   const TAGS = [
-    { id: 'awning', text: 'Awning over the cell', at: () => V(-3.2, 3.4, 4.6), steps: [0] },
-    { id: 'cframe', text: 'C-frame', at: () => V(cframe.position.x, MOUNT.y + 0.6, TRACK.z - 0.1), steps: [0, 2] },
+    { id: 'hall', text: 'Inside a closed shop', at: () => V(-10.5, 5.2, ROOF.zBack + 0.3), steps: [0] },
+    { id: 'cut', text: 'Front wall cut away', at: () => V(ROOF.x1 - 0.1, 4.8, ROOF.zFront), steps: [0] },
+    { id: 'cframe', text: 'CLOOS C-frame', at: () => V(cframe.position.x, MOUNT.y + 0.45, MOUNT.z - 1.4), steps: [0] },
     { id: 'robot', text: 'QIROX robot', at: () => joints[2].node.getWorldPosition(new THREE.Vector3()), steps: [0, 4] },
-    { id: 'track', text: 'Floor track', at: () => V(TRACK.x1 - 1.2, 0.2, TRACK.z), steps: [0] },
-    { id: 'stands', text: 'Steel stands', at: () => V(STANDS_X[4], BEAM.y0 - 0.2, 0.45), steps: [0, 1] },
-    { id: 'beam', text: 'Tacked beam', at: () => V(-2.0, beam.position.y + BEAM.d + 0.05, 0), steps: [0] },
+    { id: 'track', text: 'Floor track', at: () => V(TRACK.x1 - 1.4, 0.35, TRACK.z), steps: [0] },
+    { id: 'stands', text: 'Steel stands', at: () => V(STANDS_X[4], BEAM.y0 - 0.25, 0.48), steps: [0, 1] },
+    { id: 'beam', text: 'Tacked beam, web flat', at: beamPt(-2.0, hb + 0.02, 0), steps: [0] },
     { id: 'station', text: 'Operator station', at: () => station.localToWorld(V(0, 1.75, 0)), steps: [0, 3] },
-    { id: 'tracklen', text: 'Track longer than the beam', at: () => V(TRACK.x0 + 0.6, 0.25, TRACK.z), steps: [1] },
-    { id: 'tacks', text: 'Tacks under 5 mm (0.20 in)', at: () => V(SEAMS[2].a.x, beam.position.y + SEAMS[2].a.y, SEAMS[2].a.z), steps: [1] },
-    { id: 'laser', text: 'Laser scanner', at: () => sensor.getWorldPosition(new THREE.Vector3()), steps: [2] },
-    { id: 'found', text: 'Joints the scan found', at: () => V(SEAMS[1].b.x, beam.position.y + SEAMS[1].b.y, SEAMS[1].b.z), steps: [3] },
-    { id: 'far', text: 'Far side: not in view, turn the beam', at: () => V(FAR_SEAMS[3].b.x, beam.position.y + BEAM.d + 0.02, 0.05), steps: [3] },
+    { id: 'tracklen', text: 'Track longer than the beam', at: () => V(TRACK.x0 + 0.7, 0.4, TRACK.z), steps: [1] },
+    { id: 'tacks', text: 'Tacks under 5 mm (0.20 in)', at: beamPt(SEAMS[2].a.x, SEAMS[2].a.y, zA - 0.012), steps: [1] },
+    { id: 'scanner', text: 'Laser scanner on the C-frame', at: () => scanner.getWorldPosition(new THREE.Vector3()), steps: [2] },
+    { id: 'found', text: 'Joints the scan found', at: beamPt(SEAMS[1].b.x, SEAMS[1].b.y, 0), steps: [3] },
+    { id: 'far', text: 'Underside: not in view, turn the beam', at: beamPt(FAR_SEAMS[3].a.x, -hb, -hd), steps: [3] },
+    { id: 'rings', text: 'Ring positioners (option)', at: () => V(POS_X[1], BEAM.cy + RING_R1 + 0.05, 0), steps: [5] },
+    { id: 'turned', text: 'Other side now faces the robot', at: beamPt(FAR_SEAMS[5].a.x, FAR_SEAMS[5].a.y, 0), steps: [5] },
   ];
   TAGS.forEach(tg => {
     const el = document.createElement('div');
@@ -818,7 +924,8 @@
       if (tg.id === 'far') show = show && t > 3.8;
       if (tg.id === 'found') show = show && t > 2.0;
       if (tg.id === 'tracklen' || tg.id === 'tacks') show = show && t > 5.6;
-      if (tg.id === 'laser') show = show && laserOn;
+      if (tg.id === 'scanner') show = show && t > 1.0;
+      if (tg.id === 'turned') show = show && t > 6.6;
       if (!show) { tg.el.classList.remove('on'); continue; }
       const p = tg.at().project(camera);
       if (p.z > 1 || p.x < -1.1 || p.x > 1.1 || p.y < -1.1 || p.y > 1.1) { tg.el.classList.remove('on'); continue; }
