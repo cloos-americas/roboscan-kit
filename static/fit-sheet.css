@@ -108,4 +108,6 @@ h1, h2 {
   border-top: 1px solid #d5d7d8; padding-top: 6pt;
 }
 .foot img { height: 12pt; width: auto; }
+.foot .foot__rule { width: 1px; height: 12pt; background: #d5d7d8; }
+.foot .foot__partner { height: 17pt; }
 .foot__page { margin-left: auto; }
